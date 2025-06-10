@@ -17,7 +17,7 @@ const articles = [
     category: "Guía",
     date: "15 Mar 2023",
     readTime: "5 min",
-    image: "/placeholder.svg?height=400&width=800&text=Malezas+Comunes",
+    image: "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-1.jpg?height=400&width=800&text=Malezas+Comunes",
     content: `
       <h2>Introducción a las malezas más comunes</h2>
       <p>Las malezas representan uno de los mayores desafíos para los agricultores en todo el mundo. Compiten con los cultivos por nutrientes, agua y luz solar, reduciendo significativamente el rendimiento y la calidad de las cosechas.</p>
@@ -75,7 +75,7 @@ const articles = [
     category: "Técnicas",
     date: "2 Abr 2023",
     readTime: "8 min",
-    image: "/placeholder.svg?height=400&width=800&text=Control+Biológico",
+    image: "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-2.jpg?height=400&width=800&text=Control+Biológico",
     content: `
       <h2>El control biológico como alternativa sostenible</h2>
       <p>El control biológico de malezas representa una alternativa sostenible y respetuosa con el medio ambiente frente a los métodos químicos tradicionales. Esta técnica utiliza organismos vivos para reducir la población de malezas a niveles económicamente aceptables.</p>
@@ -135,7 +135,7 @@ const articles = [
     category: "Investigación",
     date: "10 May 2023",
     readTime: "12 min",
-    image: "/placeholder.svg?height=400&width=800&text=Impacto+Malezas",
+    image: "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-3.jpg?height=400&width=800&text=Impacto+Malezas",
     content: `
       <h2>El impacto económico y ambiental de las malezas</h2>
       <p>Las malezas representan uno de los factores más limitantes en la producción agrícola mundial. Su presencia no solo reduce el rendimiento de los cultivos, sino que también afecta la calidad de los productos, aumenta los costos de producción y puede tener impactos ambientales significativos.</p>
@@ -194,7 +194,7 @@ const articles = [
     category: "Tecnología",
     date: "25 Jun 2023",
     readTime: "10 min",
-    image: "/placeholder.svg?height=400&width=800&text=Tecnologías+Emergentes",
+    image: "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-1.jpg?height=400&width=800&text=Tecnologías+Emergentes",
     content: `
       <h2>Innovaciones tecnológicas en el control de malezas</h2>
       <p>El avance tecnológico está revolucionando la forma en que los agricultores abordan el control de malezas. Desde robots autónomos hasta sistemas de visión artificial, las nuevas tecnologías prometen un control más preciso y sostenible.</p>
@@ -262,7 +262,7 @@ const articles = [
     category: "Sostenibilidad",
     date: "8 Jul 2023",
     readTime: "9 min",
-    image: "/placeholder.svg?height=400&width=800&text=Agricultura+Orgánica",
+    image: "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-5.jpg?height=400&width=800&text=Agricultura+Orgánica",
     content: `
       <h2>Estrategias sostenibles para el control de malezas</h2>
       <p>La agricultura orgánica enfrenta desafíos únicos en el manejo de malezas debido a la restricción en el uso de herbicidas sintéticos. Sin embargo, existen numerosas estrategias efectivas que combinan métodos preventivos, culturales, mecánicos y biológicos.</p>

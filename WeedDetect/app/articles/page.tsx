@@ -288,7 +288,7 @@ export default function ArticlesPage() {
                     <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="aspect-video w-full overflow-hidden">
                       <Image
-                        src={article.urlToImage || "/placeholder.svg?height=200&width=300"}
+                        src={article.urlToImage || "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-1.jpg?height=200&width=300"}
                         width={300}
                         height={200}
                         alt={article.title}
@@ -296,7 +296,7 @@ export default function ArticlesPage() {
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
                           // Usar una imagen de placeholder en lugar de intentar cargar imágenes que no existen
-                          target.src = "/placeholder.svg?height=200&width=300"
+                          target.src = "C:/Users/Andress/Desktop/WeedDetectRepo/WeedDetect/WeedDetect/public/weed-article-1.jpg?height=200&width=300"
                         }}
                       />
                     </div>
