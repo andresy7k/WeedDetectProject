@@ -23,18 +23,29 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
+// Reemplazar la sección de configuración de Firebase con la proporcionada por el usuario
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDPj6i_vZSMqeBAyXDgeYRcZKw0W5vvIio",
+  authDomain: "etsafe.firebaseapp.com",
+  projectId: "etsafe",
+  storageBucket: "etsafe.firebasestorage.app",
+  messagingSenderId: "63661921427",
+  appId: "1:63661921427:web:08465738fcf0618f62a966",
+  measurementId: "G-3QNVTC45GH",
 }
 
+// Modificar la inicialización de Firebase para incluir Analytics
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
+let analytics
+// Solo inicializar analytics en el cliente, no en el servidor
+if (typeof window !== "undefined") {
+  // Importación dinámica para evitar errores en SSR
+  import("firebase/analytics").then(({ getAnalytics }) => {
+    analytics = getAnalytics(app)
+  })
+}
 const auth = getAuth(app)
 const googleProvider = new GoogleAuthProvider()
 const githubProvider = new GithubAuthProvider()
