@@ -236,8 +236,8 @@ export default function Home() {
                 </span>
               </h1>
               <p className="mx-auto max-w-[700px] text-gray-300 md:text-xl">
-                Más de 1,000 agricultores y 200 empresas utilizan WeedDetect para identificar y controlar malezas de
-                forma eficiente
+                WeedDetect es una herramienta avanzada que revoluciona la forma en que los agricultores y
+                agrónomos identifican y gestionan las malezas en sus cultivos.
               </p>
             </motion.div>
 
@@ -443,16 +443,6 @@ export default function Home() {
                     <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                   </Button>
                 </Link>
-                <Link href="/pricing">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="relative overflow-hidden group border-green-500 text-green-500 w-full sm:w-auto"
-                  >
-                    <span className="relative z-10">Planes para empresas</span>
-                    <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  </Button>
-                </Link>
               </div>
             </motion.div>
           </div>
@@ -488,9 +478,6 @@ export default function Home() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/pricing" className="text-gray-400 hover:text-green-500 transition-colors">
-                    Precios
-                  </Link>
                 </li>
               </ul>
             </div>

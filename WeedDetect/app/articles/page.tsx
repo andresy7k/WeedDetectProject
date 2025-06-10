@@ -17,16 +17,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useToast } from "@/components/ui/use-toast"
+
+// Actualizar la funcionalidad de favoritos para conectar con Firebase
+import { useAuth } from "@/lib/auth-context"
 
 export default function ArticlesPage() {
+  const { toast } = useToast()
+  // Añadir al inicio de la función del componente:
+  const { user } = useAuth()
+  // Reemplazar el useState de favorites con:
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
   const [favorites, setFavorites] = useState<number[]>([])
-  const [userFavorites, setUserFavorites] = useState([
-    { id: 1, title: "Control Biológico de Malezas", category: "Técnicas", date: "2 Abr 2023" },
-    { id: 3, title: "Impacto de las Malezas en la Agricultura", category: "Investigación", date: "10 May 2023" },
-  ])
+  const [userFavorites, setUserFavorites] = useState<any[]>([])
 
   // Categorías de artículos
   const categories = [
@@ -44,31 +49,93 @@ export default function ArticlesPage() {
     }, 1000)
   }, [])
 
-  // Función para manejar favoritos
-  const toggleFavorite = (id: number) => {
+  // Añadir un useEffect para cargar los favoritos del usuario:
+  useEffect(() => {
+    const loadUserFavorites = async () => {
+      if (user) {
+        try {
+          const favs = await getFavoritesFromFirebase(user.uid)
+          setUserFavorites(favs)
+          setFavorites(favs.map((f) => f.id))
+        } catch (error) {
+          console.error("Error al cargar favoritos:", error)
+        }
+      }
+    }
+
+    loadUserFavorites()
+  }, [user])
+
+  // Reemplazar la función toggleFavorite con:
+  const toggleFavorite = async (id: number, title: string, category: string) => {
+    if (!user) {
+      toast({
+        title: "Inicia sesión",
+        description: "Debes iniciar sesión para guardar favoritos",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (favorites.includes(id)) {
-      setFavorites(favorites.filter((favId) => favId !== id))
+      // Encontrar el docId para eliminar
+      const favToRemove = userFavorites.find((f) => f.id === id)
+      if (favToRemove && favToRemove.docId) {
+        const success = await removeFavoriteFromFirebase(user.uid, favToRemove.docId)
+        if (success) {
+          setFavorites(favorites.filter((favId) => favId !== id))
+          setUserFavorites(userFavorites.filter((f) => f.id !== id))
+          toast({
+            title: "Eliminado de favoritos",
+            description: "El artículo ha sido eliminado de tus favoritos",
+          })
+        }
+      }
     } else {
-      setFavorites([...favorites, id])
+      const article = {
+        id,
+        title,
+        category,
+        date: new Date().toLocaleDateString(),
+      }
+
+      const success = await saveFavoriteToFirebase(user.uid, article)
+      if (success) {
+        setFavorites([...favorites, id])
+        setUserFavorites([...userFavorites, { ...article, docId: Date.now().toString() }])
+        toast({
+          title: "Guardado en favoritos",
+          description: "El artículo ha sido guardado en tus favoritos",
+        })
+      }
     }
   }
 
-  // Función para compartir
-  const shareArticle = (title: string) => {
-    if (navigator.share) {
-      navigator
-        .share({
+  // Actualizar la función shareArticle para que funcione correctamente:
+  const shareArticle = async (title: string) => {
+    const url = window.location.href
+    const text = `Mira este artículo sobre ${title} en WeedDetect`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
           title: `WeedDetect - ${title}`,
-          text: `Mira este artículo sobre ${title} en WeedDetect`,
-          url: window.location.href,
+          text,
+          url,
         })
-        .catch((error) => console.log("Error al compartir:", error))
-    } else {
-      // Fallback para navegadores que no soportan Web Share API
-      navigator.clipboard
-        .writeText(window.location.href)
-        .then(() => alert("Enlace copiado al portapapeles"))
-        .catch((error) => console.log("Error al copiar:", error))
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${url}`)
+        toast({
+          title: "Enlace copiado",
+          description: "El enlace ha sido copiado al portapapeles",
+        })
+      }
+    } catch (error) {
+      console.error("Error al compartir:", error)
+      toast({
+        title: "Error al compartir",
+        description: "No se pudo compartir el artículo",
+      })
     }
   }
 
@@ -137,10 +204,16 @@ export default function ArticlesPage() {
                     <div className="flex justify-between w-full mt-1">
                       <span className="text-xs text-green-500">{article.category}</span>
                       <div className="flex items-center gap-1">
-                        <button className="text-green-500 hover:text-green-400">
+                        <button
+                          className="text-green-500 hover:text-green-400"
+                          onClick={() => shareArticle(article.title)}
+                        >
                           <Share2 className="h-3 w-3" />
                         </button>
-                        <button className="text-green-500 hover:text-green-400">
+                        <button
+                          className="text-green-500 hover:text-green-400"
+                          onClick={() => toggleFavorite(article.id, article.title, article.category)}
+                        >
                           <BookmarkCheck className="h-3 w-3" />
                         </button>
                       </div>
@@ -246,7 +319,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza1.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -281,7 +354,7 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(1) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(1)}
+                              onClick={() => toggleFavorite(1, "Las 10 Malezas Más Comunes en Cultivos", "Guía")}
                             >
                               {favorites.includes(1) ? (
                                 <BookmarkCheck className="h-4 w-4" />
@@ -341,7 +414,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -375,7 +448,7 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(2) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(2)}
+                              onClick={() => toggleFavorite(2, "Control Biológico de Malezas", "Técnicas")}
                             >
                               {favorites.includes(2) ? (
                                 <BookmarkCheck className="h-4 w-4" />
@@ -435,7 +508,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza2.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -469,7 +542,9 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(3) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(3)}
+                              onClick={() =>
+                                toggleFavorite(3, "Impacto de las Malezas en la Agricultura", "Investigación")
+                              }
                             >
                               {favorites.includes(3) ? (
                                 <BookmarkCheck className="h-4 w-4" />
@@ -529,7 +604,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza3.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -563,7 +638,13 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(4) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(4)}
+                              onClick={() =>
+                                toggleFavorite(
+                                  4,
+                                  "Identificación de Malezas por Etapas de Crecimiento",
+                                  "Guía Práctica",
+                                )
+                              }
                             >
                               {favorites.includes(4) ? (
                                 <BookmarkCheck className="h-4 w-4" />
@@ -623,7 +704,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza4.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -657,7 +738,7 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(5) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(5)}
+                              onClick={() => toggleFavorite(5, "Innovaciones en el Control de Malezas", "Tecnología")}
                             >
                               {favorites.includes(5) ? (
                                 <BookmarkCheck className="h-4 w-4" />
@@ -717,7 +798,7 @@ export default function ArticlesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="aspect-video w-full overflow-hidden">
                   <Image
-                    src="/placeholder.svg?height=200&width=300"
+                    src="/maleza5.jpg?height=200&width=300"
                     width={300}
                     height={200}
                     alt="Article Image"
@@ -751,7 +832,7 @@ export default function ArticlesPage() {
                           <TooltipTrigger asChild>
                             <button
                               className={`text-sm font-medium ${favorites.includes(6) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(6)}
+                              onClick={() => toggleFavorite(6, "Manejo Ecológico de Malezas", "Sostenibilidad")}
                             >
                               {favorites.includes(6) ? (
                                 <BookmarkCheck className="h-4 w-4" />

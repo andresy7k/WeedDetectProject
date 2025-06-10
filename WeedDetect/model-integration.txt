@@ -1,0 +1,77 @@
+### Arquitectura del sistema
+
+1. **Frontend (React/Next.js)**
+
+1. Interfaz de usuario para subir imágenes
+2. Visualización de resultados con regiones marcadas
+3. Generación de informes PDF
+
+
+
+2. **Backend (Python/Flask)**
+
+1. API REST para comunicarse con el frontend
+2. Integración con tu modelo de detección
+3. Almacenamiento de análisis y favoritos
+
+
+
+
+
+### Archivos clave para integrar tu modelo Python
+
+1. **`backend/model_integration.py`**
+
+1. Aquí es donde debes integrar tu código Python existente
+2. Contiene una estructura base que puedes adaptar
+3. Incluye comentarios que indican dónde colocar tu código
+
+
+
+2. **`backend/run_server.py`**
+
+1. Script principal para ejecutar el servidor Flask
+2. Maneja las solicitudes del frontend
+3. Llama a tu modelo para procesar las imágenes
+
+
+
+3. **`lib/api-service.ts`**
+
+1. Servicios del frontend para comunicarse con el backend
+2. Envía imágenes para análisis
+3. Gestiona favoritos y análisis guardados
+
+
+
+
+
+### Cómo usar esta implementación
+
+1. **Configura el backend**
+
+1. Instala las dependencias: `pip install flask flask-cors pillow numpy requests`
+2. Modifica `model_integration.py` para integrar tu modelo
+3. Ejecuta el servidor: `python run_server.py`
+
+
+
+2. **Ejecuta el frontend**
+
+1. Inicia la aplicación Next.js como lo haces normalmente
+2. Asegúrate de que se comunique con `http://localhost:5000`
+
+
+
+3. **Flujo de trabajo**
+
+1. El usuario sube una imagen en el frontend
+2. La imagen se envía al backend Python
+3. Tu modelo procesa la imagen y devuelve los resultados
+4. El frontend muestra los resultados con las regiones marcadas
+
+
+
+
+
+Esta arquitectura te permite mantener tu código Python existente mientras lo integras con una interfaz web moderna y atractiva.

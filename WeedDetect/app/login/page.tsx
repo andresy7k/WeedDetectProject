@@ -23,8 +23,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Reemplazar la sección de configuración de Firebase con la proporcionada por el usuario
-// Firebase configuration
+
 const firebaseConfig = {
   apiKey: "AIzaSyDPj6i_vZSMqeBAyXDgeYRcZKw0W5vvIio",
   authDomain: "etsafe.firebaseapp.com",
