@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Leaf, User, Upload, Trash2, LogOut, History, BookmarkCheck } from "lucide-react"
+import { ArrowLeft, Leaf, User, Upload, Trash2, LogOut, History } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -36,16 +36,11 @@ export default function ProfilePage() {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Mock data for analyses and favorites
+  // Mock data for analyses
   const [analyses, setAnalyses] = useState([
     { id: 1, date: "2023-10-15", species: "Amaranthus retroflexus (Yuyo Colorado)", confidence: 87 },
     { id: 2, date: "2023-09-22", species: "Conyza bonariensis (Rama Negra)", confidence: 92 },
     { id: 3, date: "2023-08-05", species: "Cenchrus insertus (Roseta)", confidence: 79 },
-  ])
-
-  const [favorites, setFavorites] = useState([
-    { id: 1, title: "Control Biológico de Malezas", category: "Técnicas", date: "2 Abr 2023" },
-    { id: 3, title: "Impacto de las Malezas en la Agricultura", category: "Investigación", date: "10 May 2023" },
   ])
 
   useEffect(() => {
@@ -134,14 +129,6 @@ export default function ProfilePage() {
     }
   }
 
-  const removeFavorite = (id: number) => {
-    setFavorites(favorites.filter((fav) => fav.id !== id))
-    toast({
-      title: "Artículo eliminado",
-      description: "El artículo ha sido eliminado de tus favoritos",
-    })
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-black to-green-950">
@@ -210,18 +197,12 @@ export default function ProfilePage() {
           </motion.div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="profile" className="data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Mi Perfil
               </TabsTrigger>
               <TabsTrigger value="analyses" className="data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Mis Análisis
-              </TabsTrigger>
-              <TabsTrigger
-                value="favorites"
-                className="data-[state=active]:bg-green-500 data-[state=active]:text-black"
-              >
-                Mis Favoritos
               </TabsTrigger>
             </TabsList>
 
@@ -389,67 +370,6 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             </TabsContent>
-
-            <TabsContent value="favorites">
-              <Card className="bg-black/40 backdrop-blur-sm border border-green-800/30">
-                <CardHeader>
-                  <CardTitle className="text-green-400">Artículos Favoritos</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Accede rápidamente a los artículos que has guardado
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {favorites.length > 0 ? (
-                    <div className="space-y-4">
-                      {favorites.map((favorite) => (
-                        <div
-                          key={favorite.id}
-                          className="p-4 bg-black/60 border border-green-800/30 rounded-lg hover:border-green-500/50 transition-colors"
-                        >
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                            <div>
-                              <h3 className="font-medium text-green-400">{favorite.title}</h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">
-                                  {favorite.category}
-                                </span>
-                                <span className="text-xs text-gray-400">{favorite.date}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 mt-2 md:mt-0">
-                              <Button size="sm" variant="outline" className="h-8 border-green-500 text-green-500">
-                                <BookmarkCheck className="h-3.5 w-3.5 mr-1" />
-                                Leer
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-red-500 text-red-500 hover:bg-red-500/10"
-                                onClick={() => removeFavorite(favorite.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <BookmarkCheck className="h-12 w-12 text-green-500/50 mx-auto mb-3" />
-                      <h3 className="text-lg font-medium text-gray-300">No tienes artículos guardados</h3>
-                      <p className="text-gray-400 mt-1">Guarda artículos para acceder a ellos rápidamente</p>
-                      <Link href="/articles">
-                        <Button className="mt-4 relative overflow-hidden group">
-                          <span className="relative z-10">Explorar Artículos</span>
-                          <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -465,4 +385,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-

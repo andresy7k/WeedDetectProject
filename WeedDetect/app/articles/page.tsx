@@ -1,37 +1,36 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Search, ArrowRight, Leaf, Calendar, Clock } from "lucide-react"
-import { Bookmark, BookmarkCheck, Share2 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ArrowLeft, Search, ArrowRight, Leaf, Calendar, Clock, ExternalLink } from "lucide-react"
+import { Share2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/components/ui/use-toast"
-
-// Actualizar la funcionalidad de favoritos para conectar con Firebase
-import { useAuth } from "@/lib/auth-context"
+import {
+  getWeedArticles,
+  getArticlesByCategory,
+  searchArticles,
+  formatDate,
+  calculateReadTime,
+  getCategoryFromContent,
+  type NewsArticle,
+} from "@/lib/news-api"
 
 export default function ArticlesPage() {
   const { toast } = useToast()
-  // Añadir al inicio de la función del componente:
-  const { user } = useAuth()
-  // Reemplazar el useState de favorites con:
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
-  const [favorites, setFavorites] = useState<number[]>([])
-  const [userFavorites, setUserFavorites] = useState<any[]>([])
+  const [articles, setArticles] = useState<NewsArticle[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
 
   // Categorías de artículos
   const categories = [
@@ -42,89 +41,102 @@ export default function ArticlesPage() {
     { id: "sustainability", name: "Sostenibilidad" },
   ]
 
-  // Simulación de carga inicial
+  // Cargar artículos iniciales
   useEffect(() => {
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
+    loadArticles()
   }, [])
 
-  // Añadir un useEffect para cargar los favoritos del usuario:
-  useEffect(() => {
-    const loadUserFavorites = async () => {
-      if (user) {
-        try {
-          const favs = await getFavoritesFromFirebase(user.uid)
-          setUserFavorites(favs)
-          setFavorites(favs.map((f) => f.id))
-        } catch (error) {
-          console.error("Error al cargar favoritos:", error)
-        }
+  const loadArticles = async (category = "all", search = "", page = 1) => {
+    setIsLoading(page === 1)
+    setIsSearching(search !== "")
+
+    try {
+      let response
+      if (search) {
+        response = await searchArticles(search)
+      } else if (category !== "all") {
+        response = await getArticlesByCategory(category)
+      } else {
+        response = await getWeedArticles("weeds agriculture", 20, page)
       }
-    }
 
-    loadUserFavorites()
-  }, [user])
+      // Asegurarse de que tenemos artículos válidos
+      const validArticles = response.articles.filter((article) => article.title && article.description && article.url)
 
-  // Reemplazar la función toggleFavorite con:
-  const toggleFavorite = async (id: number, title: string, category: string) => {
-    if (!user) {
+      // Si no hay suficientes artículos, complementar con datos de fallback
+      if (validArticles.length < 5) {
+        const fallbackData = await getWeedArticles("agriculture farming", 20, 1)
+        response.articles = [...validArticles, ...fallbackData.articles]
+        response.totalResults = response.articles.length
+      }
+
+      if (page === 1) {
+        setArticles(response.articles)
+      } else {
+        // Evitar duplicados al cargar más artículos
+        const existingIds = new Set(articles.map((a) => a.id))
+        const newArticles = response.articles.filter((a) => !existingIds.has(a.id))
+        setArticles((prev) => [...prev, ...newArticles])
+      }
+
+      setHasMore(response.articles.length >= 10)
+    } catch (error) {
+      console.error("Error loading articles:", error)
+
+      // En caso de error, cargar datos de fallback
+      const fallbackData = await getWeedArticles("agriculture", 20, 1)
+
+      if (page === 1) {
+        setArticles(fallbackData.articles)
+      } else {
+        setArticles((prev) => [...prev, ...fallbackData.articles])
+      }
+
       toast({
-        title: "Inicia sesión",
-        description: "Debes iniciar sesión para guardar favoritos",
-        variant: "destructive",
+        title: "Información",
+        description: "Mostrando artículos disponibles",
+        variant: "default",
       })
-      return
-    }
-
-    if (favorites.includes(id)) {
-      // Encontrar el docId para eliminar
-      const favToRemove = userFavorites.find((f) => f.id === id)
-      if (favToRemove && favToRemove.docId) {
-        const success = await removeFavoriteFromFirebase(user.uid, favToRemove.docId)
-        if (success) {
-          setFavorites(favorites.filter((favId) => favId !== id))
-          setUserFavorites(userFavorites.filter((f) => f.id !== id))
-          toast({
-            title: "Eliminado de favoritos",
-            description: "El artículo ha sido eliminado de tus favoritos",
-          })
-        }
-      }
-    } else {
-      const article = {
-        id,
-        title,
-        category,
-        date: new Date().toLocaleDateString(),
-      }
-
-      const success = await saveFavoriteToFirebase(user.uid, article)
-      if (success) {
-        setFavorites([...favorites, id])
-        setUserFavorites([...userFavorites, { ...article, docId: Date.now().toString() }])
-        toast({
-          title: "Guardado en favoritos",
-          description: "El artículo ha sido guardado en tus favoritos",
-        })
-      }
+    } finally {
+      setIsLoading(false)
+      setIsSearching(false)
     }
   }
 
-  // Actualizar la función shareArticle para que funcione correctamente:
-  const shareArticle = async (title: string) => {
-    const url = window.location.href
-    const text = `Mira este artículo sobre ${title} en WeedDetect`
+  const handleCategoryChange = (category: string) => {
+    setActiveCategory(category)
+    setCurrentPage(1)
+    setSearchQuery("")
+    loadArticles(category, "", 1)
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      setActiveCategory("all")
+      setCurrentPage(1)
+      loadArticles("all", searchQuery.trim(), 1)
+    }
+  }
+
+  const loadMoreArticles = () => {
+    const nextPage = currentPage + 1
+    setCurrentPage(nextPage)
+    loadArticles(activeCategory, searchQuery, nextPage)
+  }
+
+  const shareArticle = async (article: NewsArticle) => {
+    const text = `Mira este artículo sobre ${article.title} en WeedDetect`
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `WeedDetect - ${title}`,
+          title: `WeedDetect - ${article.title}`,
           text,
-          url,
+          url: article.url,
         })
       } else {
-        await navigator.clipboard.writeText(`${text}\n${url}`)
+        await navigator.clipboard.writeText(`${text}\n${article.url}`)
         toast({
           title: "Enlace copiado",
           description: "El enlace ha sido copiado al portapapeles",
@@ -170,63 +182,13 @@ export default function ArticlesPage() {
       </div>
 
       <main className="flex-1 container px-4 md:px-6 py-12 relative z-10">
-        <div className="flex justify-between items-center mb-8">
+        <div className="mb-8">
           <Link href="/" className="inline-flex items-center text-green-500 hover:text-green-400 group">
             <motion.div whileHover={{ x: -3 }} transition={{ duration: 0.2 }}>
               <ArrowLeft className="mr-2 h-4 w-4 group-hover:text-green-400" />
             </motion.div>
             <span>Volver al inicio</span>
           </Link>
-
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black"
-                >
-                  <BookmarkCheck className="h-4 w-4 mr-2" />
-                  Mis Favoritos
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-72 bg-black border border-green-800">
-                <DropdownMenuLabel className="text-green-400">Artículos Guardados</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-green-800/30" />
-                {userFavorites.map((article) => (
-                  <DropdownMenuItem
-                    key={article.id}
-                    className="flex flex-col items-start py-2 hover:bg-green-900/20 cursor-pointer"
-                  >
-                    <div className="flex justify-between w-full">
-                      <span className="font-medium text-white">{article.title}</span>
-                      <span className="text-xs text-gray-400">{article.date}</span>
-                    </div>
-                    <div className="flex justify-between w-full mt-1">
-                      <span className="text-xs text-green-500">{article.category}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          className="text-green-500 hover:text-green-400"
-                          onClick={() => shareArticle(article.title)}
-                        >
-                          <Share2 className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="text-green-500 hover:text-green-400"
-                          onClick={() => toggleFavorite(article.id, article.title, article.category)}
-                        >
-                          <BookmarkCheck className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="bg-green-800/30" />
-                <DropdownMenuItem className="text-green-500 hover:bg-green-900/20 cursor-pointer">
-                  Ver todos mis favoritos
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </div>
 
         <motion.div
@@ -242,7 +204,7 @@ export default function ArticlesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              Artículos y Recursos
+              Artículos y Noticias sobre Malezas
             </motion.h1>
             <motion.p
               className="text-gray-300 md:text-lg max-w-2xl mx-auto"
@@ -250,12 +212,12 @@ export default function ArticlesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              Explora nuestra colección de artículos, guías y recursos sobre identificación y control de malezas.
+              Mantente actualizado con las últimas noticias, investigaciones y avances en el control de malezas.
             </motion.p>
           </div>
 
           <div className="mb-8">
-            <div className="relative max-w-md mx-auto">
+            <form onSubmit={handleSearch} className="relative max-w-md mx-auto">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               <Input
                 type="text"
@@ -264,7 +226,12 @@ export default function ArticlesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </div>
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-500 border-t-transparent" />
+                </div>
+              )}
+            </form>
           </div>
 
           {/* Categorías */}
@@ -277,7 +244,7 @@ export default function ArticlesPage() {
                     ? "bg-green-500 text-black"
                     : "bg-black/40 border border-green-800/30 text-gray-300 hover:bg-green-900/30"
                 }`}
-                onClick={() => setActiveCategory(category.id)}
+                onClick={() => handleCategoryChange(category.id)}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
@@ -306,597 +273,122 @@ export default function ArticlesPage() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Artículo 1 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza1.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Guía
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {articles.map((article, index) => (
+                  <motion.div
+                    key={article.id}
+                    className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ y: -5 }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="aspect-video w-full overflow-hidden">
+                      <Image
+                        src={article.urlToImage || "/placeholder.svg?height=200&width=300"}
+                        width={300}
+                        height={200}
+                        alt={article.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          // Usar una imagen de placeholder en lugar de intentar cargar imágenes que no existen
+                          target.src = "/placeholder.svg?height=200&width=300"
+                        }}
+                      />
                     </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>15 Mar 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Las 10 Malezas Más Comunes en Cultivos
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Aprende a identificar las malezas más frecuentes que afectan a los cultivos y cómo controlarlas de
-                    manera efectiva.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>5 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(1) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(1, "Las 10 Malezas Más Comunes en Cultivos", "Guía")}
-                            >
-                              {favorites.includes(1) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(1) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <div className="p-4 relative z-10">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
+                          {getCategoryFromContent(article.title, article.description || "")}
+                        </div>
+                        <div className="flex items-center text-xs text-gray-400">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          <span>{formatDate(article.publishedAt)}</span>
+                        </div>
+                      </div>
+                      <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors line-clamp-2">
+                        {article.title}
+                      </h3>
+                      <p className="mt-2 line-clamp-2 text-sm text-gray-300">
+                        {article.description || "Descripción no disponible"}
+                      </p>
+                      <div className="mt-2 text-xs text-gray-400">Fuente: {article.source.name}</div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="flex items-center text-xs text-gray-400">
+                          <Clock className="h-3 w-3 mr-1" />
+                          <span>{calculateReadTime(article.content || article.description || "")}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
+                                  onClick={() => shareArticle(article)}
+                                >
+                                  <Share2 className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="bg-black border-green-800 text-white">
+                                <p>Compartir artículo</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
 
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Las 10 Malezas Más Comunes en Cultivos")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                          <a
+                            href={article.url || `/articles/article/${article.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
+                          >
+                            Leer más
+                            <ExternalLink className="h-3 w-3 ml-1" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
 
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artículo 2 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Técnicas
-                    </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>2 Abr 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Control Biológico de Malezas
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Descubre métodos naturales y sostenibles para controlar malezas sin depender de productos químicos.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>8 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(2) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(2, "Control Biológico de Malezas", "Técnicas")}
-                            >
-                              {favorites.includes(2) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(2) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Control Biológico de Malezas")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artículo 3 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza2.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Investigación
-                    </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>10 May 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Impacto de las Malezas en la Agricultura
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Análisis del impacto económico y ambiental de las malezas en diferentes sistemas agrícolas.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>12 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(3) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() =>
-                                toggleFavorite(3, "Impacto de las Malezas en la Agricultura", "Investigación")
-                              }
-                            >
-                              {favorites.includes(3) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(3) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Impacto de las Malezas en la Agricultura")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artículo 4 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza3.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Guía Práctica
-                    </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>22 Jun 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Identificación de Malezas por Etapas de Crecimiento
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Cómo reconocer diferentes especies de malezas en sus distintas etapas de desarrollo.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>10 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(4) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() =>
-                                toggleFavorite(
-                                  4,
-                                  "Identificación de Malezas por Etapas de Crecimiento",
-                                  "Guía Práctica",
-                                )
-                              }
-                            >
-                              {favorites.includes(4) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(4) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Identificación de Malezas por Etapas de Crecimiento")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artículo 5 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.5 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza4.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Tecnología
-                    </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>8 Jul 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Innovaciones en el Control de Malezas
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Las últimas tecnologías y métodos para el manejo eficiente de malezas en la agricultura moderna.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>7 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(5) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(5, "Innovaciones en el Control de Malezas", "Tecnología")}
-                            >
-                              {favorites.includes(5) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(5) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Innovaciones en el Control de Malezas")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artículo 6 */}
-              <motion.div
-                className="group relative overflow-hidden rounded-lg border border-green-800/30 bg-black/40 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.6 }}
-                whileHover={{ y: -5 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="aspect-video w-full overflow-hidden">
-                  <Image
-                    src="/maleza5.jpg?height=200&width=300"
-                    width={300}
-                    height={200}
-                    alt="Article Image"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="inline-block rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-500">
-                      Sostenibilidad
-                    </div>
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>19 Ago 2023</span>
-                    </div>
-                  </div>
-                  <h3 className="mt-1 text-lg font-bold text-green-400 group-hover:text-green-300 transition-colors">
-                    Manejo Ecológico de Malezas
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-300">
-                    Estrategias para controlar malezas respetando el medio ambiente y promoviendo la biodiversidad.
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>9 min de lectura</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className={`text-sm font-medium ${favorites.includes(6) ? "text-green-500" : "text-gray-400 hover:text-green-500"} transition-colors`}
-                              onClick={() => toggleFavorite(6, "Manejo Ecológico de Malezas", "Sostenibilidad")}
-                            >
-                              {favorites.includes(6) ? (
-                                <BookmarkCheck className="h-4 w-4" />
-                              ) : (
-                                <Bookmark className="h-4 w-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>{favorites.includes(6) ? "Quitar de favoritos" : "Guardar en favoritos"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="text-sm font-medium text-gray-400 hover:text-green-500 transition-colors"
-                              onClick={() => shareArticle("Manejo Ecológico de Malezas")}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="bg-black border-green-800 text-white">
-                            <p>Compartir artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <Link
-                        href="#"
-                        className="text-sm font-medium text-green-500 hover:text-green-400 transition-colors group-hover:underline flex items-center"
-                      >
-                        Leer más
-                        <motion.div
-                          animate={{ x: [0, 3, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, repeatDelay: 0.5 }}
-                        >
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </motion.div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
+              {/* Botón cargar más */}
+              {hasMore && articles.length > 0 && (
+                <motion.div
+                  className="mt-12 flex justify-center"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Button
+                    variant="outline"
+                    className="relative overflow-hidden group border-green-500 text-green-500"
+                    onClick={loadMoreArticles}
+                    disabled={isLoading}
+                  >
+                    <span className="relative z-10 flex items-center">
+                      {isLoading ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-500 border-t-transparent mr-2" />
+                          Cargando...
+                        </>
+                      ) : (
+                        <>
+                          Cargar más artículos
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </>
+                      )}
+                    </span>
+                    <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  </Button>
+                </motion.div>
+              )}
+            </>
           )}
-
-          <motion.div
-            className="mt-12 flex justify-center"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <Button variant="outline" className="relative overflow-hidden group border-green-500 text-green-500">
-              <span className="relative z-10 flex items-center">
-                Cargar más artículos
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </span>
-              <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-            </Button>
-          </motion.div>
 
           {/* Newsletter */}
           <motion.div
@@ -910,9 +402,9 @@ export default function ArticlesPage() {
             <div className="relative z-10">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="text-left">
-                  <h3 className="text-xl font-bold text-green-400 mb-2">Suscríbete a nuestro boletín</h3>
+                  <h3 className="text-xl font-bold text-green-400 mb-2">Mantente actualizado</h3>
                   <p className="text-gray-300">
-                    Recibe los últimos artículos y actualizaciones directamente en tu correo.
+                    Recibe las últimas noticias sobre agricultura y control de malezas directamente en tu correo.
                   </p>
                 </div>
                 <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2">
@@ -1011,4 +503,5 @@ export default function ArticlesPage() {
     </div>
   )
 }
+
 

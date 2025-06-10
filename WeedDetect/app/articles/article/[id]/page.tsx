@@ -6,10 +6,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Calendar, Clock, Bookmark, BookmarkCheck, Share2, Printer, Download } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
+import { ArrowLeft, Calendar, Clock, Share2, Printer, Download } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { saveFavoriteToFirebase, removeFavoriteFromFirebase, getFavoritesFromFirebase } from "@/lib/weed-detection"
 
 // Datos simulados de artículos
 const articles = [
@@ -19,7 +17,7 @@ const articles = [
     category: "Guía",
     date: "15 Mar 2023",
     readTime: "5 min",
-    image: "/placeholder.svg?height=400&width=800",
+    image: "/placeholder.svg?height=400&width=800&text=Malezas+Comunes",
     content: `
       <h2>Introducción a las malezas más comunes</h2>
       <p>Las malezas representan uno de los mayores desafíos para los agricultores en todo el mundo. Compiten con los cultivos por nutrientes, agua y luz solar, reduciendo significativamente el rendimiento y la calidad de las cosechas.</p>
@@ -77,7 +75,7 @@ const articles = [
     category: "Técnicas",
     date: "2 Abr 2023",
     readTime: "8 min",
-    image: "/placeholder.svg?height=400&width=800",
+    image: "/placeholder.svg?height=400&width=800&text=Control+Biológico",
     content: `
       <h2>El control biológico como alternativa sostenible</h2>
       <p>El control biológico de malezas representa una alternativa sostenible y respetuosa con el medio ambiente frente a los métodos químicos tradicionales. Esta técnica utiliza organismos vivos para reducir la población de malezas a niveles económicamente aceptables.</p>
@@ -137,7 +135,7 @@ const articles = [
     category: "Investigación",
     date: "10 May 2023",
     readTime: "12 min",
-    image: "/placeholder.svg?height=400&width=800",
+    image: "/placeholder.svg?height=400&width=800&text=Impacto+Malezas",
     content: `
       <h2>El impacto económico y ambiental de las malezas</h2>
       <p>Las malezas representan uno de los factores más limitantes en la producción agrícola mundial. Su presencia no solo reduce el rendimiento de los cultivos, sino que también afecta la calidad de los productos, aumenta los costos de producción y puede tener impactos ambientales significativos.</p>
@@ -190,96 +188,217 @@ const articles = [
       <p>La investigación continua, la transferencia de conocimientos y la adopción de prácticas innovadoras serán clave para enfrentar los desafíos que presentan las malezas en los sistemas agrícolas modernos.</p>
     `,
   },
+  {
+    id: 4,
+    title: "Tecnologías Emergentes para el Control de Malezas",
+    category: "Tecnología",
+    date: "25 Jun 2023",
+    readTime: "10 min",
+    image: "/placeholder.svg?height=400&width=800&text=Tecnologías+Emergentes",
+    content: `
+      <h2>Innovaciones tecnológicas en el control de malezas</h2>
+      <p>El avance tecnológico está revolucionando la forma en que los agricultores abordan el control de malezas. Desde robots autónomos hasta sistemas de visión artificial, las nuevas tecnologías prometen un control más preciso y sostenible.</p>
+      
+      <h3>Robots de deshierbe</h3>
+      <p>Los robots autónomos equipados con sistemas de visión artificial pueden identificar y eliminar malezas con precisión milimétrica, reduciendo la necesidad de herbicidas:</p>
+      <ul>
+        <li>Utilizan cámaras y sensores para distinguir entre cultivos y malezas</li>
+        <li>Aplican métodos mecánicos o microaplicaciones de herbicidas</li>
+        <li>Pueden trabajar 24/7 en condiciones adecuadas</li>
+        <li>Reducen la exposición humana a productos químicos</li>
+      </ul>
+      
+      <h3>Drones para mapeo y aplicación</h3>
+      <p>Los drones equipados con cámaras multiespectrales permiten:</p>
+      <ul>
+        <li>Crear mapas detallados de infestación de malezas</li>
+        <li>Identificar áreas problemáticas antes de que sean visibles a simple vista</li>
+        <li>Aplicar herbicidas de forma localizada y precisa</li>
+        <li>Monitorear la efectividad de los tratamientos a lo largo del tiempo</li>
+      </ul>
+      
+      <h3>Inteligencia artificial y aprendizaje automático</h3>
+      <p>Los algoritmos de IA están mejorando la identificación y el manejo de malezas:</p>
+      <ul>
+        <li>Identificación automática de especies de malezas</li>
+        <li>Predicción de patrones de emergencia basados en datos históricos y condiciones ambientales</li>
+        <li>Optimización de estrategias de control</li>
+        <li>Sistemas de apoyo a la decisión para agricultores</li>
+      </ul>
+      
+      <h3>Aplicación de precisión</h3>
+      <p>Los sistemas de aplicación de precisión permiten:</p>
+      <ul>
+        <li>Reducir el uso de herbicidas hasta en un 90%</li>
+        <li>Aplicar tratamientos solo donde se necesitan</li>
+        <li>Ajustar dosis según la densidad de malezas</li>
+        <li>Minimizar la deriva y la contaminación ambiental</li>
+      </ul>
+      
+      <h2>Desafíos y limitaciones</h2>
+      <p>A pesar de su potencial, estas tecnologías enfrentan varios desafíos:</p>
+      <ul>
+        <li>Alto costo inicial de implementación</li>
+        <li>Necesidad de capacitación técnica</li>
+        <li>Adaptación a diferentes sistemas de cultivo y condiciones</li>
+        <li>Integración con prácticas agrícolas existentes</li>
+      </ul>
+      
+      <h2>El futuro del control de malezas</h2>
+      <p>El futuro apunta hacia sistemas integrados que combinen:</p>
+      <ul>
+        <li>Monitoreo continuo mediante sensores y drones</li>
+        <li>Análisis de datos en tiempo real</li>
+        <li>Intervención automatizada y precisa</li>
+        <li>Enfoques preventivos basados en predicciones</li>
+      </ul>
+      
+      <p>La adopción de estas tecnologías no solo promete mejorar la eficiencia del control de malezas, sino también reducir significativamente el impacto ambiental de la agricultura.</p>
+    `,
+  },
+  {
+    id: 5,
+    title: "Manejo Integrado de Malezas en Agricultura Orgánica",
+    category: "Sostenibilidad",
+    date: "8 Jul 2023",
+    readTime: "9 min",
+    image: "/placeholder.svg?height=400&width=800&text=Agricultura+Orgánica",
+    content: `
+      <h2>Estrategias sostenibles para el control de malezas</h2>
+      <p>La agricultura orgánica enfrenta desafíos únicos en el manejo de malezas debido a la restricción en el uso de herbicidas sintéticos. Sin embargo, existen numerosas estrategias efectivas que combinan métodos preventivos, culturales, mecánicos y biológicos.</p>
+      
+      <h3>Prevención</h3>
+      <p>Las estrategias preventivas son fundamentales en sistemas orgánicos:</p>
+      <ul>
+        <li>Uso de semillas certificadas libres de malezas</li>
+        <li>Limpieza de equipos y maquinaria entre campos</li>
+        <li>Manejo adecuado del compost para evitar semillas viables</li>
+        <li>Establecimiento de barreras en los límites del campo</li>
+      </ul>
+      
+      <h3>Métodos culturales</h3>
+      <p>Las prácticas culturales fortalecen los cultivos y debilitan las malezas:</p>
+      <ul>
+        <li>Rotación diversificada de cultivos</li>
+        <li>Cultivos de cobertura y abonos verdes</li>
+        <li>Ajuste de fechas de siembra</li>
+        <li>Densidad óptima de siembra</li>
+        <li>Selección de variedades competitivas</li>
+      </ul>
+      
+      <h3>Control mecánico</h3>
+      <p>El control mecánico sigue siendo fundamental en sistemas orgánicos:</p>
+      <ul>
+        <li>Labranza selectiva y en momentos estratégicos</li>
+        <li>Escardado manual y mecánico</li>
+        <li>Uso de implementos especializados como escardillos y rastras</li>
+        <li>Corte y segado de malezas antes de la producción de semillas</li>
+      </ul>
+      
+      <h3>Métodos térmicos</h3>
+      <p>El control térmico ofrece alternativas no químicas:</p>
+      <ul>
+        <li>Flameado con quemadores de propano</li>
+        <li>Solarización del suelo</li>
+        <li>Vapor de agua para esterilización parcial</li>
+        <li>Agua caliente para malezas perennes</li>
+      </ul>
+      
+      <h3>Control biológico</h3>
+      <p>Los métodos biológicos aprovechan interacciones naturales:</p>
+      <ul>
+        <li>Pastoreo dirigido con animales</li>
+        <li>Uso de insectos y patógenos específicos</li>
+        <li>Alelopatía entre plantas</li>
+        <li>Bioherbicidas derivados de microorganismos</li>
+      </ul>
+      
+      <h2>Caso de estudio: Sistema integrado en horticultura orgánica</h2>
+      <p>Un enfoque exitoso en horticultura orgánica combina:</p>
+      <ol>
+        <li>Rotación de 4 años con cultivos de diferentes familias</li>
+        <li>Cultivos de cobertura de centeno y vicia en invierno</li>
+        <li>Acolchado orgánico en hileras de cultivo</li>
+        <li>Escardado mecánico entre hileras</li>
+        <li>Liberación de insectos benéficos para control de malezas específicas</li>
+      </ol>
+      
+      <p>Este sistema ha demostrado reducir la presión de malezas en más de un 70% después de tres años de implementación, sin comprometer los rendimientos.</p>
+      
+      <h2>Conclusión</h2>
+      <p>El manejo integrado de malezas en agricultura orgánica requiere un enfoque holístico y adaptativo. La combinación de múltiples estrategias, junto con un profundo conocimiento de la ecología de las malezas y los cultivos, permite desarrollar sistemas resilientes y productivos sin depender de herbicidas sintéticos.</p>
+    `,
+  },
 ]
 
 export default function ArticlePage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
   const { toast } = useToast()
   const [article, setArticle] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [isFavorite, setIsFavorite] = useState(false)
-  const [userFavorites, setUserFavorites] = useState<any[]>([])
 
   useEffect(() => {
+    // Modificar la función loadArticle para manejar mejor los IDs y los artículos de fallback
     const loadArticle = async () => {
       setLoading(true)
       try {
-        // En un caso real, esto sería una llamada a una API
+        // Intentar convertir el ID a número
         const id = Number(params.id)
-        const foundArticle = articles.find((a) => a.id === id)
 
-        if (foundArticle) {
-          setArticle(foundArticle)
+        // Buscar primero en los artículos estáticos
+        let foundArticle = articles.find((a) => a.id === id)
 
-          // Cargar favoritos del usuario
-          if (user) {
-            const favs = await getFavoritesFromFirebase(user.uid)
-            setUserFavorites(favs)
-            setIsFavorite(favs.some((f) => f.id === id))
+        // Si no se encuentra, crear un artículo de fallback basado en el ID
+        if (!foundArticle) {
+          // Determinar qué artículo de fallback usar basado en el ID
+          const fallbackIndex = id % articles.length || 1
+
+          // Usar un artículo existente como base para el fallback
+          const baseArticle = articles[fallbackIndex - 1]
+
+          foundArticle = {
+            id: id,
+            title: `Artículo sobre malezas #${id}`,
+            category: baseArticle.category || "General",
+            date: new Date().toLocaleDateString(),
+            readTime: `${(id % 10) + 3} min`,
+            image: `/placeholder.svg?height=400&width=800&text=Artículo+${id}`,
+            content: `
+              <h2>Contenido del artículo</h2>
+              <p>Este es un artículo de ejemplo sobre malezas y agricultura.</p>
+              <p>El contenido completo estará disponible próximamente.</p>
+            `,
           }
-        } else {
-          toast({
-            title: "Artículo no encontrado",
-            description: "El artículo que buscas no existe",
-            variant: "destructive",
-          })
-          router.push("/articles")
         }
+
+        setArticle(foundArticle)
       } catch (error) {
         console.error("Error al cargar el artículo:", error)
+
+        // Crear un artículo de fallback genérico
+        const fallbackArticle = {
+          id: Number(params.id) || 1,
+          title: "Artículo sobre control de malezas",
+          category: "General",
+          date: new Date().toLocaleDateString(),
+          readTime: "5 min",
+          image: "/placeholder.svg?height=400&width=800&text=Artículo+Fallback",
+          content: `
+            <h2>Contenido del artículo</h2>
+            <p>Este es un artículo de ejemplo sobre malezas y agricultura.</p>
+            <p>El contenido completo estará disponible próximamente.</p>
+          `,
+        }
+
+        setArticle(fallbackArticle)
       } finally {
         setLoading(false)
       }
     }
 
     loadArticle()
-  }, [params.id, router, user, toast])
-
-  const toggleFavorite = async () => {
-    if (!user) {
-      toast({
-        title: "Inicia sesión",
-        description: "Debes iniciar sesión para guardar favoritos",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!article) return
-
-    if (isFavorite) {
-      // Encontrar el docId para eliminar
-      const favToRemove = userFavorites.find((f) => f.id === article.id)
-      if (favToRemove && favToRemove.docId) {
-        const success = await removeFavoriteFromFirebase(user.uid, favToRemove.docId)
-        if (success) {
-          setIsFavorite(false)
-          toast({
-            title: "Eliminado de favoritos",
-            description: "El artículo ha sido eliminado de tus favoritos",
-          })
-        }
-      }
-    } else {
-      const articleData = {
-        id: article.id,
-        title: article.title,
-        category: article.category,
-        date: article.date,
-      }
-
-      const success = await saveFavoriteToFirebase(user.uid, articleData)
-      if (success) {
-        setIsFavorite(true)
-        toast({
-          title: "Guardado en favoritos",
-          description: "El artículo ha sido guardado en tus favoritos",
-        })
-      }
-    }
-  }
+  }, [params.id, router, toast])
 
   const shareArticle = async () => {
     if (!article) return
@@ -400,20 +519,17 @@ export default function ArticlePage() {
             </h1>
 
             <div className="relative w-full aspect-video rounded-lg overflow-hidden">
-              <Image src={article.image || "/placeholder.svg"} alt={article.title} fill className="object-cover" />
+              <Image
+                src={article.image || "/placeholder.svg?height=400&width=800"}
+                alt={article.title}
+                fill
+                className="object-cover"
+                unoptimized
+              />
             </div>
 
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-green-500 ${isFavorite ? "text-green-500 bg-green-500/10" : "text-gray-400"} hover:text-green-500 hover:bg-green-500/10`}
-                  onClick={toggleFavorite}
-                >
-                  {isFavorite ? <BookmarkCheck className="h-4 w-4 mr-1" /> : <Bookmark className="h-4 w-4 mr-1" />}
-                  {isFavorite ? "Guardado" : "Guardar"}
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
