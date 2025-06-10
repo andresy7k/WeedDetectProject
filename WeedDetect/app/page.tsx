@@ -2,14 +2,14 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Leaf, Menu, X } from "lucide-react"
+import { Search, Leaf, Menu, X, ChevronRight } from "lucide-react"
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-black to-green-950">
@@ -18,7 +18,7 @@ export default function Home() {
         <div className="container flex h-16 items-center justify-between py-4">
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/logo.png" alt="WeedDetect Logo" width={32} height={32} />
+              <Leaf className="h-6 w-6 text-green-500" />
               <span className="text-xl font-bold text-green-500">WeedDetect</span>
             </Link>
           </div>
@@ -143,25 +143,51 @@ export default function Home() {
             </motion.div>
 
             <motion.div
-              className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4"
+              className="mt-12"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <Link href="/detection">
-                <Button size="lg" className="bg-green-500 text-black hover:bg-green-600 w-full sm:w-auto">
-                  Detectar malezas
-                </Button>
-              </Link>
-              <Link href="/articles">
+              {!showOptions ? (
                 <Button
                   size="lg"
-                  variant="outline"
-                  className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black w-full sm:w-auto"
+                  className="bg-green-500 text-black hover:bg-green-600 group relative overflow-hidden"
+                  onClick={() => setShowOptions(true)}
                 >
-                  Explorar artículos
+                  <span className="relative z-10 flex items-center">
+                    Comenzar
+                    <motion.div
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+                    >
+                      <ChevronRight className="h-5 w-5 ml-1" />
+                    </motion.div>
+                  </span>
+                  <span className="absolute inset-0 bg-green-400 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></span>
                 </Button>
-              </Link>
+              ) : (
+                <motion.div
+                  className="flex flex-col sm:flex-row items-center justify-center gap-4"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Link href="/detection">
+                    <Button size="lg" className="bg-green-500 text-black hover:bg-green-600 w-full sm:w-auto">
+                      Detectar malezas
+                    </Button>
+                  </Link>
+                  <Link href="/articles">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black w-full sm:w-auto"
+                    >
+                      Explorar artículos
+                    </Button>
+                  </Link>
+                </motion.div>
+              )}
             </motion.div>
           </div>
         </section>
@@ -274,7 +300,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             <div className="space-y-4">
               <Link href="/" className="flex items-center gap-2">
-                <Image src="/logo.png" alt="WeedDetect Logo" width={24} height={24} />
+                <Leaf className="h-5 w-5 text-green-500" />
                 <span className="text-lg font-bold text-green-500">WeedDetect</span>
               </Link>
               <p className="text-sm text-gray-400">Tecnología avanzada para la identificación y control de malezas.</p>

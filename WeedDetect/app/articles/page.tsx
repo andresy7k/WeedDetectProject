@@ -6,7 +6,7 @@ import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Search, ArrowRight } from "lucide-react"
+import { ArrowLeft, Search, ArrowRight, Leaf } from "lucide-react"
 
 export default function ArticlesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -274,7 +274,7 @@ export default function ArticlesPage() {
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             <div className="space-y-4">
               <Link href="/" className="flex items-center gap-2">
-                <Image src="/logo.png" alt="WeedDetect Logo" width={24} height={24} />
+                <Leaf className="h-5 w-5 text-green-500" />
                 <span className="text-lg font-bold text-green-500">WeedDetect</span>
               </Link>
               <p className="text-sm text-gray-400">Tecnología avanzada para la identificación y control de malezas.</p>
