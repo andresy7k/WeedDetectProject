@@ -5,12 +5,13 @@ import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Leaf, Menu, X, ChevronRight, Search, Info } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [count, setCount] = useState(0)
+  const { user } = useAuth()
 
   // Efecto para el contador de plantas identificadas
   useEffect(() => {
@@ -24,16 +25,6 @@ export default function Home() {
 
     return () => clearInterval(interval)
   }, [count])
-
-  // Seguimiento de la posición del mouse para efectos interactivos
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [])
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-black to-green-950 relative overflow-hidden">
@@ -64,21 +55,6 @@ export default function Home() {
           />
         ))}
       </div>
-
-      {/* Efecto de seguimiento del cursor */}
-      <motion.div
-        className="hidden md:block fixed w-40 h-40 rounded-full bg-green-500/10 pointer-events-none z-0"
-        animate={{
-          x: mousePosition.x - 80,
-          y: mousePosition.y - 80,
-        }}
-        transition={{
-          type: "spring",
-          damping: 30,
-          stiffness: 200,
-          mass: 0.5,
-        }}
-      />
 
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b border-green-800/30 bg-black/80 backdrop-blur">
@@ -138,12 +114,35 @@ export default function Home() {
               Contacto
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-green-500 to-green-300 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link href="/login">
-              <Button className="ml-4 relative overflow-hidden group">
-                <span className="relative z-10 flex items-center">Acceder / Registrarse</span>
-                <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-              </Button>
-            </Link>
+
+            {user ? (
+              <Link href="/profile">
+                <Button className="ml-4 relative overflow-hidden group">
+                  <span className="relative z-10 flex items-center">
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL || "/placeholder.svg"}
+                        alt={user.displayName || "Usuario"}
+                        className="w-6 h-6 rounded-full mr-2"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center mr-2">
+                        {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
+                      </div>
+                    )}
+                    {user.displayName || "Perfil"}
+                  </span>
+                  <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button className="ml-4 relative overflow-hidden group">
+                  <span className="relative z-10 flex items-center">Acceder</span>
+                  <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                </Button>
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -187,11 +186,32 @@ export default function Home() {
                   Contacto
                 </Link>
                 <div className="pt-2">
-                  <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                    <Button className="w-full bg-gradient-to-r from-green-600 to-green-400 hover:from-green-500 hover:to-green-300">
-                      Acceder / Registrarse
-                    </Button>
-                  </Link>
+                  {user ? (
+                    <Link href="/profile" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-gradient-to-r from-green-600 to-green-400 hover:from-green-500 hover:to-green-300">
+                        <span className="flex items-center">
+                          {user.photoURL ? (
+                            <img
+                              src={user.photoURL || "/placeholder.svg"}
+                              alt={user.displayName || "Usuario"}
+                              className="w-6 h-6 rounded-full mr-2"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center mr-2">
+                              {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
+                            </div>
+                          )}
+                          {user.displayName || "Perfil"}
+                        </span>
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-gradient-to-r from-green-600 to-green-400 hover:from-green-500 hover:to-green-300">
+                        Acceder
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </motion.div>

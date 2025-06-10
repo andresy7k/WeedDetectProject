@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -31,6 +30,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { jsPDF } from "jspdf"
+import { WeedDetector, WeedType } from "@/lib/weed-detection"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function DetectionPage() {
   const [selectedTab, setSelectedTab] = useState("upload")
@@ -40,19 +42,24 @@ export default function DetectionPage() {
   const [showResults, setShowResults] = useState(false)
   const [urlInput, setUrlInput] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const [weedDetector] = useState(() => new WeedDetector())
+  const [detectionResult, setDetectionResult] = useState<{
+    weedType: WeedType
+    confidence: number
+    allPredictions: { type: WeedType; confidence: number }[]
+  } | null>(null)
+
   const [userAnalyses, setUserAnalyses] = useState([
-    { id: 1, date: "2023-10-15", species: "Amaranthus retroflexus", confidence: 87 },
-    { id: 2, date: "2023-09-22", species: "Cirsium arvense", confidence: 92 },
-    { id: 3, date: "2023-08-05", species: "Echinochloa crus-galli", confidence: 79 },
+    { id: 1, date: "2023-10-15", species: "Amaranthus retroflexus (Yuyo Colorado)", confidence: 87 },
+    { id: 2, date: "2023-09-22", species: "Conyza bonariensis (Rama Negra)", confidence: 92 },
+    { id: 3, date: "2023-08-05", species: "Cenchrus insertus (Roseta)", confidence: 79 },
   ])
 
-  // Seguimiento de la posición del mouse para efectos interactivos
-  // Eliminar el efecto del círculo que sigue al mouse
-  // Eliminar estas líneas:
-  // Eliminar este useEffect:
-
   const downloadPDF = () => {
-    if (!showResults) return
+    if (!showResults || !detectionResult) return
 
     const doc = new jsPDF()
 
@@ -72,26 +79,40 @@ export default function DetectionPage() {
     doc.text("Especie Detectada:", 20, 50)
 
     doc.setFontSize(14)
-    doc.text("Amaranthus retroflexus (Bledo)", 20, 60)
+    doc.text(detectionResult.weedType, 20, 60)
 
     doc.setFontSize(16)
     doc.text("Confianza:", 20, 75)
     doc.setFontSize(14)
-    doc.text("87%", 20, 85)
+    doc.text(`${detectionResult.confidence}%`, 20, 85)
 
     doc.setFontSize(16)
-    doc.text("Características:", 20, 100)
+    doc.text("Otras predicciones:", 20, 100)
     doc.setFontSize(12)
-    doc.text("• Planta anual de crecimiento rápido", 25, 110)
-    doc.text("• Hojas ovales con bordes lisos", 25, 120)
-    doc.text("• Tallos robustos de color rojizo", 25, 130)
+
+    detectionResult.allPredictions.forEach((pred, index) => {
+      if (pred.type !== detectionResult.weedType) {
+        doc.text(`• ${pred.type}: ${pred.confidence}%`, 25, 110 + index * 10)
+      }
+    })
 
     doc.setFontSize(16)
     doc.text("Recomendaciones de Control:", 20, 150)
     doc.setFontSize(12)
-    doc.text("Esta especie es resistente a varios herbicidas. Se recomienda control", 20, 160)
-    doc.text("mecánico en etapas tempranas o el uso de herbicidas específicos", 20, 170)
-    doc.text("como glifosato en aplicaciones dirigidas.", 20, 180)
+
+    if (detectionResult.weedType === WeedType.YUYO_COLORADO) {
+      doc.text("Esta especie es resistente a varios herbicidas. Se recomienda control", 20, 160)
+      doc.text("mecánico en etapas tempranas o el uso de herbicidas específicos", 20, 170)
+      doc.text("como glifosato en aplicaciones dirigidas.", 20, 180)
+    } else if (detectionResult.weedType === WeedType.RAMA_NEGRA) {
+      doc.text("Esta especie ha desarrollado resistencia a glifosato. Se recomienda", 20, 160)
+      doc.text("aplicar herbicidas en etapas tempranas de desarrollo y utilizar", 20, 170)
+      doc.text("mezclas de principios activos para un mejor control.", 20, 180)
+    } else if (detectionResult.weedType === WeedType.ROSETA) {
+      doc.text("Para esta especie se recomienda control mecánico y aplicación", 20, 160)
+      doc.text("de herbicidas pre-emergentes. Es importante controlarla antes", 20, 170)
+      doc.text("de la floración para evitar la dispersión de semillas.", 20, 180)
+    }
 
     // Añadir pie de página
     doc.setFontSize(10)
@@ -148,14 +169,51 @@ export default function DetectionPage() {
     }
   }
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     if (imageUrl) {
       setIsAnalyzing(true)
-      // Simulación de análisis
-      setTimeout(() => {
+
+      try {
+        // Esperar a que la imagen se cargue completamente
+        if (imageRef.current && imageRef.current.complete) {
+          // Realizar la detección real con el modelo
+          const result = await weedDetector.detectWeed(imageRef.current)
+          setDetectionResult(result)
+
+          // Guardar el análisis en el historial si el usuario está autenticado
+          if (user) {
+            const newAnalysis = {
+              id: Date.now(),
+              date: new Date().toLocaleDateString(),
+              species: result.weedType,
+              confidence: result.confidence,
+            }
+
+            setUserAnalyses((prev) => [newAnalysis, ...prev])
+
+            toast({
+              title: "Análisis guardado",
+              description: "El resultado ha sido guardado en tu historial",
+            })
+          }
+
+          setShowResults(true)
+        } else {
+          // Si la imagen no está cargada, simular la detección
+          const simulatedResult = weedDetector.simulatePrediction()
+          setDetectionResult(simulatedResult)
+          setShowResults(true)
+        }
+      } catch (error) {
+        console.error("Error en el análisis:", error)
+        toast({
+          title: "Error en el análisis",
+          description: "No se pudo procesar la imagen. Intenta con otra imagen.",
+          variant: "destructive",
+        })
+      } finally {
         setIsAnalyzing(false)
-        setShowResults(true)
-      }, 3000)
+      }
     }
   }
 
@@ -163,6 +221,45 @@ export default function DetectionPage() {
     setImageUrl("")
     setUrlInput("")
     setShowResults(false)
+    setDetectionResult(null)
+  }
+
+  const getWeedCharacteristics = (weedType: WeedType) => {
+    switch (weedType) {
+      case WeedType.YUYO_COLORADO:
+        return [
+          "Planta anual de crecimiento rápido",
+          "Hojas ovales con bordes lisos",
+          "Tallos robustos de color rojizo",
+        ]
+      case WeedType.RAMA_NEGRA:
+        return [
+          "Planta anual o bianual",
+          "Hojas alternas, lanceoladas y pubescentes",
+          "Inflorescencias en forma de panículas",
+        ]
+      case WeedType.ROSETA:
+        return [
+          "Planta anual con crecimiento rastrero",
+          "Flores con pequeñas espinas",
+          "Semillas con capacidad de adherencia",
+        ]
+      default:
+        return ["Características no disponibles"]
+    }
+  }
+
+  const getWeedRecommendation = (weedType: WeedType) => {
+    switch (weedType) {
+      case WeedType.YUYO_COLORADO:
+        return "Esta especie es resistente a varios herbicidas. Se recomienda control mecánico en etapas tempranas o el uso de herbicidas específicos como glifosato en aplicaciones dirigidas."
+      case WeedType.RAMA_NEGRA:
+        return "Esta especie ha desarrollado resistencia a glifosato. Se recomienda aplicar herbicidas en etapas tempranas de desarrollo y utilizar mezclas de principios activos para un mejor control."
+      case WeedType.ROSETA:
+        return "Para esta especie se recomienda control mecánico y aplicación de herbicidas pre-emergentes. Es importante controlarla antes de la floración para evitar la dispersión de semillas."
+      default:
+        return "Recomendaciones no disponibles para esta especie."
+    }
   }
 
   return (
@@ -195,11 +292,7 @@ export default function DetectionPage() {
         ))}
       </div>
 
-      {/* Efecto de seguimiento del cursor */}
-      {/* Eliminar este componente: */}
-
       <main className="flex-1 container px-4 md:px-6 py-12 relative z-10">
-        {/* Reemplazar el div con className="mb-8" por el código anterior */}
         <div className="flex justify-between items-center mb-8">
           <Link href="/" className="inline-flex items-center text-green-500 hover:text-green-400 group">
             <motion.div whileHover={{ x: -3 }} transition={{ duration: 0.2 }}>
@@ -208,49 +301,57 @@ export default function DetectionPage() {
             <span>Volver al inicio</span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black"
-                >
-                  <History className="h-4 w-4 mr-2" />
-                  Mis Análisis
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-72 bg-black border border-green-800">
-                <DropdownMenuLabel className="text-green-400">Análisis Recientes</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-green-800/30" />
-                {userAnalyses.map((analysis) => (
-                  <DropdownMenuItem
-                    key={analysis.id}
-                    className="flex flex-col items-start py-2 hover:bg-green-900/20 cursor-pointer"
+          {user && (
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black"
                   >
-                    <div className="flex justify-between w-full">
-                      <span className="font-medium text-white">{analysis.species}</span>
-                      <span className="text-xs text-gray-400">{analysis.date}</span>
-                    </div>
-                    <div className="flex justify-between w-full mt-1">
-                      <span className="text-xs text-gray-400">Confianza: {analysis.confidence}%</span>
-                      <div className="flex items-center gap-1">
-                        <button className="text-green-500 hover:text-green-400">
-                          <FileText className="h-3 w-3" />
-                        </button>
-                        <button className="text-green-500 hover:text-green-400">
-                          <Download className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="bg-green-800/30" />
-                <DropdownMenuItem className="text-green-500 hover:bg-green-900/20 cursor-pointer">
-                  Ver todos mis análisis
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                    <History className="h-4 w-4 mr-2" />
+                    Mis Análisis
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-72 bg-black border border-green-800">
+                  <DropdownMenuLabel className="text-green-400">Análisis Recientes</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-green-800/30" />
+                  {userAnalyses.length > 0 ? (
+                    <>
+                      {userAnalyses.map((analysis) => (
+                        <DropdownMenuItem
+                          key={analysis.id}
+                          className="flex flex-col items-start py-2 hover:bg-green-900/20 cursor-pointer"
+                        >
+                          <div className="flex justify-between w-full">
+                            <span className="font-medium text-white">{analysis.species}</span>
+                            <span className="text-xs text-gray-400">{analysis.date}</span>
+                          </div>
+                          <div className="flex justify-between w-full mt-1">
+                            <span className="text-xs text-gray-400">Confianza: {analysis.confidence}%</span>
+                            <div className="flex items-center gap-1">
+                              <button className="text-green-500 hover:text-green-400">
+                                <FileText className="h-3 w-3" />
+                              </button>
+                              <button className="text-green-500 hover:text-green-400">
+                                <Download className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator className="bg-green-800/30" />
+                      <DropdownMenuItem className="text-green-500 hover:bg-green-900/20 cursor-pointer">
+                        Ver todos mis análisis
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <div className="py-2 px-2 text-sm text-gray-400 text-center">No tienes análisis guardados</div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
         <motion.div
@@ -316,11 +417,11 @@ export default function DetectionPage() {
                           >
                             {imageUrl ? (
                               <div className="relative w-full h-full">
-                                <Image
+                                <img
+                                  ref={imageRef}
                                   src={imageUrl || "/placeholder.svg"}
                                   alt="Uploaded Image"
-                                  fill
-                                  className="object-contain"
+                                  className="object-contain w-full h-full"
                                 />
                                 <button
                                   className="absolute top-2 right-2 bg-black/70 rounded-full p-1 hover:bg-black transition-colors"
@@ -409,11 +510,11 @@ export default function DetectionPage() {
 
                             {imageUrl && selectedTab === "url" && (
                               <div className="relative w-full h-40 mt-4">
-                                <Image
+                                <img
+                                  ref={imageRef}
                                   src={imageUrl || "/placeholder.svg"}
                                   alt="URL Image"
-                                  fill
-                                  className="object-contain rounded-lg"
+                                  className="object-contain w-full h-full rounded-lg"
                                 />
                                 <button
                                   className="absolute top-2 right-2 bg-black/70 rounded-full p-1 hover:bg-black transition-colors"
@@ -503,11 +604,10 @@ export default function DetectionPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="relative">
                           <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-green-800">
-                            <Image
+                            <img
                               src={imageUrl || "/placeholder.svg"}
                               alt="Analyzed Image"
-                              fill
-                              className="object-cover"
+                              className="object-cover w-full h-full"
                             />
                             <div className="absolute inset-0 border-4 border-green-500/50 rounded-lg"></div>
                             <div className="absolute top-2 right-2 bg-green-500 text-black text-xs font-bold px-2 py-1 rounded-full">
@@ -517,90 +617,89 @@ export default function DetectionPage() {
                         </div>
 
                         <div className="space-y-4">
-                          <div className="p-4 bg-green-900/20 rounded-lg border border-green-800/50">
-                            <div className="flex items-start space-x-3">
-                              <div className="rounded-full bg-green-500/20 p-1 mt-0.5">
-                                <Check className="h-4 w-4 text-green-500" />
+                          {detectionResult && (
+                            <>
+                              <div className="p-4 bg-green-900/20 rounded-lg border border-green-800/50">
+                                <div className="flex items-start space-x-3">
+                                  <div className="rounded-full bg-green-500/20 p-1 mt-0.5">
+                                    <Check className="h-4 w-4 text-green-500" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-green-400">Especie Detectada:</h4>
+                                    <p className="text-white text-lg font-semibold">{detectionResult.weedType}</p>
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <h4 className="font-bold text-green-400">Especie Detectada:</h4>
-                                <p className="text-white text-lg font-semibold">Amaranthus retroflexus</p>
-                                <p className="text-gray-400 text-sm">Nombre común: Bledo</p>
+
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="font-bold text-green-400">Confianza:</h4>
+                                  <span className="text-white font-bold">{detectionResult.confidence}%</span>
+                                </div>
+                                <div className="h-2 w-full rounded-full bg-green-900/20 overflow-hidden">
+                                  <motion.div
+                                    className="h-2 rounded-full bg-gradient-to-r from-green-600 to-green-400"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${detectionResult.confidence}%` }}
+                                    transition={{ duration: 1, delay: 0.2 }}
+                                  ></motion.div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <h4 className="font-bold text-green-400">Confianza:</h4>
-                              <span className="text-white font-bold">87%</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-green-900/20 overflow-hidden">
-                              <motion.div
-                                className="h-2 rounded-full bg-gradient-to-r from-green-600 to-green-400"
-                                initial={{ width: 0 }}
-                                animate={{ width: "87%" }}
-                                transition={{ duration: 1, delay: 0.2 }}
-                              ></motion.div>
-                            </div>
-                          </div>
+                              <div className="space-y-2">
+                                <h4 className="font-bold text-green-400">Características:</h4>
+                                <ul className="space-y-1 text-sm text-gray-300">
+                                  {getWeedCharacteristics(detectionResult.weedType).map(
+                                    (characteristic, index) => (index) => (
+                                      <li key={index} className="flex items-start space-x-2">
+                                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                        <span>{characteristic}</span>
+                                      </li>
+                                    ),
+                                  )}
+                                </ul>
+                              </div>
 
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-green-400">Características:</h4>
-                            <ul className="space-y-1 text-sm text-gray-300">
-                              <li className="flex items-start space-x-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>Planta anual de crecimiento rápido</span>
-                              </li>
-                              <li className="flex items-start space-x-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>Hojas ovales con bordes lisos</span>
-                              </li>
-                              <li className="flex items-start space-x-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>Tallos robustos de color rojizo</span>
-                              </li>
-                            </ul>
-                          </div>
-
-                          {/* Buscar el botón "Ver Información Detallada" y reemplazar el div que lo contiene por: */}
-                          <div className="flex space-x-2">
-                            <Button className="flex-1 relative overflow-hidden group">
-                              <span className="relative z-10 flex items-center">
-                                <Info className="h-4 w-4 mr-1" />
-                                Ver Información Detallada
-                              </span>
-                              <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="relative overflow-hidden group border-green-500 text-green-500"
-                              onClick={downloadPDF}
-                            >
-                              <span className="relative z-10 flex items-center">
-                                <Download className="h-4 w-4 mr-1" />
-                                PDF
-                              </span>
-                              <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                            </Button>
-                          </div>
+                              <div className="flex space-x-2">
+                                <Button className="flex-1 relative overflow-hidden group">
+                                  <span className="relative z-10 flex items-center">
+                                    <Info className="h-4 w-4 mr-1" />
+                                    Ver Información Detallada
+                                  </span>
+                                  <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="relative overflow-hidden group border-green-500 text-green-500"
+                                  onClick={downloadPDF}
+                                >
+                                  <span className="relative z-10 flex items-center">
+                                    <Download className="h-4 w-4 mr-1" />
+                                    PDF
+                                  </span>
+                                  <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                                </Button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      <div className="mt-4 p-4 bg-yellow-900/20 rounded-lg border border-yellow-800/50">
-                        <div className="flex items-start space-x-3">
-                          <div className="rounded-full bg-yellow-500/20 p-1 mt-0.5">
-                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-yellow-400">Recomendaciones de Control:</h4>
-                            <p className="text-gray-300 text-sm mt-1">
-                              Esta especie es resistente a varios herbicidas. Se recomienda control mecánico en etapas
-                              tempranas o el uso de herbicidas específicos como glifosato en aplicaciones dirigidas.
-                            </p>
+                      {detectionResult && (
+                        <div className="mt-4 p-4 bg-yellow-900/20 rounded-lg border border-yellow-800/50">
+                          <div className="flex items-start space-x-3">
+                            <div className="rounded-full bg-yellow-500/20 p-1 mt-0.5">
+                              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-yellow-400">Recomendaciones de Control:</h4>
+                              <p className="text-gray-300 text-sm mt-1">
+                                {getWeedRecommendation(detectionResult.weedType)}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
