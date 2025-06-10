@@ -9,22 +9,212 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Leaf, Github } from "lucide-react"
+import { ArrowLeft, Leaf, Github, AlertCircle } from "lucide-react"
+import { initializeApp } from "firebase/app"
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  GithubAuthProvider,
+  sendPasswordResetEmail,
+} from "firebase/auth"
+import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+}
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig)
+const auth = getAuth(app)
+const googleProvider = new GoogleAuthProvider()
+const githubProvider = new GithubAuthProvider()
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState("login")
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
 
-    // Simulación de carga
-    setTimeout(() => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      setSuccess("Inicio de sesión exitoso")
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Redirigiendo al panel principal...",
+        variant: "default",
+      })
+      // Redirigir al usuario después de un inicio de sesión exitoso
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 1500)
+    } catch (error: any) {
+      console.error("Error al iniciar sesión:", error)
+      let errorMessage = "Error al iniciar sesión. Inténtalo de nuevo."
+
+      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+        errorMessage = "Email o contraseña incorrectos."
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Demasiados intentos fallidos. Inténtalo más tarde."
+      }
+
+      setError(errorMessage)
+      toast({
+        title: "Error de autenticación",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
+  }
+
+  const handleEmailRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, password)
+      setSuccess("Registro exitoso")
+      toast({
+        title: "Cuenta creada exitosamente",
+        description: "Ya puedes iniciar sesión con tus credenciales",
+        variant: "default",
+      })
+      // Cambiar a la pestaña de inicio de sesión después del registro
+      setActiveTab("login")
+    } catch (error: any) {
+      console.error("Error al registrarse:", error)
+      let errorMessage = "Error al crear la cuenta. Inténtalo de nuevo."
+
+      if (error.code === "auth/email-already-in-use") {
+        errorMessage = "Este email ya está registrado."
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Email inválido."
+      }
+
+      setError(errorMessage)
+      toast({
+        title: "Error de registro",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true)
+    setError("")
+
+    try {
+      await signInWithPopup(auth, googleProvider)
+      setSuccess("Inicio de sesión con Google exitoso")
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Redirigiendo al panel principal...",
+        variant: "default",
+      })
+      // Redirigir al usuario después de un inicio de sesión exitoso
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 1500)
+    } catch (error: any) {
+      console.error("Error al iniciar sesión con Google:", error)
+      setError("Error al iniciar sesión con Google. Inténtalo de nuevo.")
+      toast({
+        title: "Error de autenticación",
+        description: "No se pudo iniciar sesión con Google",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGithubLogin = async () => {
+    setIsLoading(true)
+    setError("")
+
+    try {
+      await signInWithPopup(auth, githubProvider)
+      setSuccess("Inicio de sesión con GitHub exitoso")
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Redirigiendo al panel principal...",
+        variant: "default",
+      })
+      // Redirigir al usuario después de un inicio de sesión exitoso
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 1500)
+    } catch (error: any) {
+      console.error("Error al iniciar sesión con GitHub:", error)
+      setError("Error al iniciar sesión con GitHub. Inténtalo de nuevo.")
+      toast({
+        title: "Error de autenticación",
+        description: "No se pudo iniciar sesión con GitHub",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Ingresa tu email para restablecer la contraseña")
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+
+    try {
+      await sendPasswordResetEmail(auth, email)
+      setSuccess("Se ha enviado un correo para restablecer tu contraseña")
+      toast({
+        title: "Correo enviado",
+        description: "Revisa tu bandeja de entrada para restablecer tu contraseña",
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Error al enviar correo de restablecimiento:", error)
+      setError("No se pudo enviar el correo de restablecimiento. Verifica tu email.")
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el correo de restablecimiento",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -96,7 +286,23 @@ export default function LoginPage() {
             <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent"></div>
 
             <div className="relative z-10">
-              <Tabs defaultValue="login" className="w-full" onValueChange={setActiveTab}>
+              {error && (
+                <Alert variant="destructive" className="mb-4 bg-red-900/20 border-red-800 text-white">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {success && (
+                <Alert className="mb-4 bg-green-900/20 border-green-800 text-white">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Éxito</AlertTitle>
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+
+              <Tabs defaultValue="login" className="w-full" value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger
                     value="login"
@@ -118,7 +324,7 @@ export default function LoginPage() {
                     <p className="text-gray-400 text-sm mt-1">Inicia sesión para continuar</p>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleEmailLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input
@@ -134,12 +340,13 @@ export default function LoginPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="password">Contraseña</Label>
-                        <Link
-                          href="/forgot-password"
+                        <button
+                          type="button"
+                          onClick={handleForgotPassword}
                           className="text-xs text-green-500 hover:text-green-400 transition-colors"
                         >
                           ¿Olvidaste tu contraseña?
-                        </Link>
+                        </button>
                       </div>
                       <Input
                         id="password"
@@ -196,7 +403,8 @@ export default function LoginPage() {
                     <Button
                       variant="outline"
                       className="w-full border-green-800/50 text-white hover:bg-green-500 hover:text-black transition-colors"
-                      onClick={() => setIsLoading(true)}
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
                     >
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                         <path
@@ -209,7 +417,8 @@ export default function LoginPage() {
                     <Button
                       variant="outline"
                       className="w-full border-green-800/50 text-white hover:bg-green-500 hover:text-black transition-colors"
-                      onClick={() => setIsLoading(true)}
+                      onClick={handleGithubLogin}
+                      disabled={isLoading}
                     >
                       <Github className="mr-2 h-4 w-4" />
                       GitHub
@@ -223,7 +432,7 @@ export default function LoginPage() {
                     <p className="text-gray-400 text-sm mt-1">Regístrate para comenzar</p>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleEmailRegister} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Nombre</Label>
                       <Input
@@ -232,6 +441,8 @@ export default function LoginPage() {
                         placeholder="Tu nombre"
                         required
                         className="bg-black/50 border-green-800/50 text-white placeholder:text-gray-500 focus:border-green-500"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -242,6 +453,8 @@ export default function LoginPage() {
                         placeholder="tu@email.com"
                         required
                         className="bg-black/50 border-green-800/50 text-white placeholder:text-gray-500 focus:border-green-500"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -251,7 +464,10 @@ export default function LoginPage() {
                         type="password"
                         required
                         className="bg-black/50 border-green-800/50 text-white focus:border-green-500"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                       />
+                      <p className="text-xs text-gray-400">La contraseña debe tener al menos 6 caracteres</p>
                     </div>
 
                     <Button type="submit" className="w-full relative overflow-hidden group" disabled={isLoading}>
@@ -299,7 +515,8 @@ export default function LoginPage() {
                     <Button
                       variant="outline"
                       className="w-full border-green-800/50 text-white hover:bg-green-500 hover:text-black transition-colors"
-                      onClick={() => setIsLoading(true)}
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
                     >
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                         <path
@@ -312,7 +529,8 @@ export default function LoginPage() {
                     <Button
                       variant="outline"
                       className="w-full border-green-800/50 text-white hover:bg-green-500 hover:text-black transition-colors"
-                      onClick={() => setIsLoading(true)}
+                      onClick={handleGithubLogin}
+                      disabled={isLoading}
                     >
                       <Github className="mr-2 h-4 w-4" />
                       GitHub

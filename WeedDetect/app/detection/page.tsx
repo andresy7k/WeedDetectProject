@@ -2,14 +2,35 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, LinkIcon, ArrowLeft, Leaf, Check, XIcon, Info, AlertTriangle } from "lucide-react"
+import {
+  Upload,
+  LinkIcon,
+  ArrowLeft,
+  Leaf,
+  Check,
+  XIcon,
+  Info,
+  AlertTriangle,
+  Download,
+  History,
+  FileText,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { jsPDF } from "jspdf"
 
 export default function DetectionPage() {
   const [selectedTab, setSelectedTab] = useState("upload")
@@ -18,18 +39,68 @@ export default function DetectionPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [urlInput, setUrlInput] = useState("")
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [userAnalyses, setUserAnalyses] = useState([
+    { id: 1, date: "2023-10-15", species: "Amaranthus retroflexus", confidence: 87 },
+    { id: 2, date: "2023-09-22", species: "Cirsium arvense", confidence: 92 },
+    { id: 3, date: "2023-08-05", species: "Echinochloa crus-galli", confidence: 79 },
+  ])
 
   // Seguimiento de la posición del mouse para efectos interactivos
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
+  // Eliminar el efecto del círculo que sigue al mouse
+  // Eliminar estas líneas:
+  // Eliminar este useEffect:
 
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [])
+  const downloadPDF = () => {
+    if (!showResults) return
+
+    const doc = new jsPDF()
+
+    // Añadir título
+    doc.setFontSize(20)
+    doc.setTextColor(34, 197, 94) // verde
+    doc.text("Informe de Detección - WeedDetect", 20, 20)
+
+    // Añadir fecha
+    doc.setFontSize(12)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 30)
+
+    // Añadir resultados
+    doc.setFontSize(16)
+    doc.setTextColor(0, 0, 0)
+    doc.text("Especie Detectada:", 20, 50)
+
+    doc.setFontSize(14)
+    doc.text("Amaranthus retroflexus (Bledo)", 20, 60)
+
+    doc.setFontSize(16)
+    doc.text("Confianza:", 20, 75)
+    doc.setFontSize(14)
+    doc.text("87%", 20, 85)
+
+    doc.setFontSize(16)
+    doc.text("Características:", 20, 100)
+    doc.setFontSize(12)
+    doc.text("• Planta anual de crecimiento rápido", 25, 110)
+    doc.text("• Hojas ovales con bordes lisos", 25, 120)
+    doc.text("• Tallos robustos de color rojizo", 25, 130)
+
+    doc.setFontSize(16)
+    doc.text("Recomendaciones de Control:", 20, 150)
+    doc.setFontSize(12)
+    doc.text("Esta especie es resistente a varios herbicidas. Se recomienda control", 20, 160)
+    doc.text("mecánico en etapas tempranas o el uso de herbicidas específicos", 20, 170)
+    doc.text("como glifosato en aplicaciones dirigidas.", 20, 180)
+
+    // Añadir pie de página
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text("© WeedDetect - Tecnología avanzada para la identificación de malezas", 20, 280)
+
+    // Guardar PDF
+    doc.save("weeddetect-informe.pdf")
+  }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -125,28 +196,61 @@ export default function DetectionPage() {
       </div>
 
       {/* Efecto de seguimiento del cursor */}
-      <motion.div
-        className="hidden md:block fixed w-40 h-40 rounded-full bg-green-500/10 pointer-events-none z-0"
-        animate={{
-          x: mousePosition.x - 80,
-          y: mousePosition.y - 80,
-        }}
-        transition={{
-          type: "spring",
-          damping: 30,
-          stiffness: 200,
-          mass: 0.5,
-        }}
-      />
+      {/* Eliminar este componente: */}
 
       <main className="flex-1 container px-4 md:px-6 py-12 relative z-10">
-        <div className="mb-8">
+        {/* Reemplazar el div con className="mb-8" por el código anterior */}
+        <div className="flex justify-between items-center mb-8">
           <Link href="/" className="inline-flex items-center text-green-500 hover:text-green-400 group">
             <motion.div whileHover={{ x: -3 }} transition={{ duration: 0.2 }}>
               <ArrowLeft className="mr-2 h-4 w-4 group-hover:text-green-400" />
             </motion.div>
             <span>Volver al inicio</span>
           </Link>
+
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Mis Análisis
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-72 bg-black border border-green-800">
+                <DropdownMenuLabel className="text-green-400">Análisis Recientes</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-green-800/30" />
+                {userAnalyses.map((analysis) => (
+                  <DropdownMenuItem
+                    key={analysis.id}
+                    className="flex flex-col items-start py-2 hover:bg-green-900/20 cursor-pointer"
+                  >
+                    <div className="flex justify-between w-full">
+                      <span className="font-medium text-white">{analysis.species}</span>
+                      <span className="text-xs text-gray-400">{analysis.date}</span>
+                    </div>
+                    <div className="flex justify-between w-full mt-1">
+                      <span className="text-xs text-gray-400">Confianza: {analysis.confidence}%</span>
+                      <div className="flex items-center gap-1">
+                        <button className="text-green-500 hover:text-green-400">
+                          <FileText className="h-3 w-3" />
+                        </button>
+                        <button className="text-green-500 hover:text-green-400">
+                          <Download className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator className="bg-green-800/30" />
+                <DropdownMenuItem className="text-green-500 hover:bg-green-900/20 cursor-pointer">
+                  Ver todos mis análisis
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <motion.div
@@ -459,6 +563,7 @@ export default function DetectionPage() {
                             </ul>
                           </div>
 
+                          {/* Buscar el botón "Ver Información Detallada" y reemplazar el div que lo contiene por: */}
                           <div className="flex space-x-2">
                             <Button className="flex-1 relative overflow-hidden group">
                               <span className="relative z-10 flex items-center">
@@ -466,6 +571,17 @@ export default function DetectionPage() {
                                 Ver Información Detallada
                               </span>
                               <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="relative overflow-hidden group border-green-500 text-green-500"
+                              onClick={downloadPDF}
+                            >
+                              <span className="relative z-10 flex items-center">
+                                <Download className="h-4 w-4 mr-1" />
+                                PDF
+                              </span>
+                              <span className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                             </Button>
                           </div>
                         </div>
