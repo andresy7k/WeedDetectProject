@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs"
-// Tipos de malezas ampliados con especies latinas
+
 export enum WeedType {
   YUYO_COLORADO = "Amaranthus quitensis (Yuyo Colorado)",
   RAMA_NEGRA = "Conyza bonariensis (Rama Negra)",
@@ -12,7 +12,6 @@ export enum WeedType {
   UNKNOWN = "Desconocido",
 }
 
-// Interfaz para las regiones detectadas
 export interface DetectedRegion {
   x: number
   y: number
@@ -21,12 +20,14 @@ export interface DetectedRegion {
   confidence: number
 }
 
-// Clase para la detección de malezas
 export class WeedDetector {
   private model: tf.LayersModel | null = null
   private regionModel: tf.LayersModel | null = null
   private isModelLoading = false
-  private readonly IMAGE_SIZE = 400 // Tamaño de imagen usado en el modelo (400x400)
+  public isDemoMode = true
+  public modelError: string | null = null
+
+  private readonly IMAGE_SIZE = 224
   private readonly CLASS_NAMES = [
     WeedType.YUYO_COLORADO,
     WeedType.RAMA_NEGRA,
@@ -39,299 +40,151 @@ export class WeedDetector {
   ]
 
   constructor() {
-    // Cargar los modelos cuando se instancia la clase
     this.loadModels()
   }
 
-  // Cargar los modelos de TensorFlow.js
   private async loadModels(): Promise<void> {
     if ((this.model && this.regionModel) || this.isModelLoading) return
 
     this.isModelLoading = true
+    this.modelError = null
 
     try {
       console.log("Cargando modelos de detección de malezas...")
 
-      // Cargar modelo de clasificación
-      await this.loadClassificationModel()
+      try {
+        this.model = await tf.loadLayersModel("/models/classification-model.json")
+        console.log("Modelo de clasificación cargado")
+      } catch {
+        this.model = null
+      }
 
-      // Cargar modelo de detección de regiones
-      await this.loadRegionDetectionModel()
+      try {
+        this.regionModel = await tf.loadLayersModel("/models/region-model.json")
+        console.log("Modelo de regiones cargado")
+      } catch {
+        this.regionModel = null
+      }
 
-      console.log("Modelos cargados exitosamente")
+      if (this.model) {
+        this.isDemoMode = false
+        console.log("Modelos cargados exitosamente")
+      } else {
+        this.isDemoMode = true
+        this.modelError = "No se encontró un modelo entrenado en /models/. Resultados en modo demostración."
+        console.warn(this.modelError)
+      }
     } catch (error) {
+      this.isDemoMode = true
+      this.modelError = "Error al cargar los modelos. Modo demostración activo."
       console.error("Error al cargar los modelos:", error)
-      throw new Error("No se pudieron cargar los modelos de detección de malezas")
     } finally {
       this.isModelLoading = false
     }
   }
 
-  // Cargar el modelo de clasificación
-  private async loadClassificationModel(): Promise<void> {
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const input = tf.input({ shape: [this.IMAGE_SIZE, this.IMAGE_SIZE, 3] })
-
-    // Primera capa convolucional (2 capas de 16 filtros)
-    const conv1 = tf.layers
-      .conv2d({
-        filters: 16,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(input)
-
-    const conv2 = tf.layers
-      .conv2d({
-        filters: 16,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(conv1)
-
-    const pool1 = tf.layers.maxPooling2d({ poolSize: 2 }).apply(conv2)
-
-    // Segunda capa convolucional (2 capas de 32 filtros)
-    const conv3 = tf.layers
-      .conv2d({
-        filters: 32,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(pool1)
-
-    const conv4 = tf.layers
-      .conv2d({
-        filters: 32,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(conv3)
-
-    const pool2 = tf.layers.maxPooling2d({ poolSize: 2 }).apply(conv4)
-
-    // Tercera capa convolucional (2 capas de 64 filtros)
-    const conv5 = tf.layers
-      .conv2d({
-        filters: 64,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(pool2)
-
-    const conv6 = tf.layers
-      .conv2d({
-        filters: 64,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "valid",
-      })
-      .apply(conv5)
-
-    const pool3 = tf.layers.maxPooling2d({ poolSize: 2 }).apply(conv6)
-
-    // Aplanar y capas densas
-    const flatten = tf.layers.flatten().apply(pool3)
-
-    const dense1 = tf.layers
-      .dense({
-        units: 128,
-        activation: "relu",
-      })
-      .apply(flatten)
-
-    const dropout = tf.layers.dropout({ rate: 0.3 }).apply(dense1)
-
-    const output = tf.layers
-      .dense({
-        units: this.CLASS_NAMES.length,
-        activation: "softmax",
-      })
-      .apply(dropout)
-
-    this.model = tf.model({ inputs: input, outputs: output as tf.SymbolicTensor })
-  }
-
-  // Cargar el modelo de detección de regiones
-  private async loadRegionDetectionModel(): Promise<void> {
-    // Simulamos la carga del modelo con un retraso
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Creamos un modelo simulado para detección de regiones
-    const input = tf.input({ shape: [this.IMAGE_SIZE, this.IMAGE_SIZE, 3] })
-
-    // Arquitectura similar a una red U-Net simplificada para segmentación
-    const conv1 = tf.layers
-      .conv2d({
-        filters: 32,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "same",
-      })
-      .apply(input)
-
-    const pool1 = tf.layers.maxPooling2d({ poolSize: 2 }).apply(conv1)
-
-    const conv2 = tf.layers
-      .conv2d({
-        filters: 64,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "same",
-      })
-      .apply(pool1)
-
-    const pool2 = tf.layers.maxPooling2d({ poolSize: 2 }).apply(conv2)
-
-    const conv3 = tf.layers
-      .conv2d({
-        filters: 128,
-        kernelSize: 3,
-        activation: "relu",
-        padding: "same",
-      })
-      .apply(pool2)
-
-    // Capas de detección de regiones
-    const regionOutput = tf.layers
-      .conv2d({
-        filters: 5, // x, y, width, height, confidence
-        kernelSize: 1,
-        activation: "sigmoid",
-        padding: "same",
-      })
-      .apply(conv3)
-
-    this.regionModel = tf.model({ inputs: input, outputs: regionOutput as tf.SymbolicTensor })
-  }
-
-  // Preprocesar la imagen para el modelo
-  private async preprocessImage(imageData: ImageData | HTMLImageElement): Promise<tf.Tensor> {
+  private preprocessImage(image: ImageData | HTMLImageElement): tf.Tensor {
     return tf.tidy(() => {
-      let tensor
-
-      // Convertir la imagen a un tensor
-      if (imageData instanceof ImageData) {
-        tensor = tf.browser.fromPixels(imageData)
-      } else {
-        tensor = tf.browser.fromPixels(imageData)
-      }
-
-      // Redimensionar a 400x400 (tamaño esperado por el modelo)
+      const tensor = tf.browser.fromPixels(image)
       const resized = tf.image.resizeBilinear(tensor, [this.IMAGE_SIZE, this.IMAGE_SIZE])
-
-      // Normalizar valores de 0-255 a 0-1
       const normalized = resized.div(tf.scalar(255))
-
-      // Expandir dimensiones para que coincida con la entrada del modelo [batch, height, width, channels]
       return normalized.expandDims(0)
     })
   }
 
-  // Detectar regiones de malezas en la imagen
   private async detectRegions(tensor: tf.Tensor): Promise<DetectedRegion[]> {
-    if (!this.regionModel) {
-      await this.loadModels()
-    }
-
-    if (!this.regionModel) {
-      throw new Error("El modelo de detección de regiones no está disponible")
-    }
+    if (!this.regionModel) return []
 
     try {
-      // Realizar la predicción
       const predictions = (await this.regionModel.predict(tensor)) as tf.Tensor
-
-      // Obtener los resultados
-      const regionsData = await predictions.data()
-
-      // Liberar memoria
+      const data = await predictions.data()
+      const shape = predictions.shape
       predictions.dispose()
 
-      // Procesar los datos para obtener las regiones
+      const gridH = shape[1] || 1
+      const gridW = shape[2] || 1
+      const channels = shape[3] || 5
       const regions: DetectedRegion[] = []
+      const CONF_THRESHOLD = 0.5
 
-      // Simular la detección de 2-4 regiones
-      const numRegions = Math.floor(Math.random() * 3) + 2
-
-      for (let i = 0; i < numRegions; i++) {
-        regions.push({
-          x: Math.random() * 0.7 + 0.1, // Valores entre 0.1 y 0.8
-          y: Math.random() * 0.7 + 0.1, // Valores entre 0.1 y 0.8
-          width: Math.random() * 0.3 + 0.1, // Valores entre 0.1 y 0.4
-          height: Math.random() * 0.3 + 0.1, // Valores entre 0.1 y 0.4
-          confidence: Math.random() * 0.3 + 0.7, // Valores entre 0.7 y 1.0
-        })
+      for (let gy = 0; gy < gridH; gy++) {
+        for (let gx = 0; gx < gridW; gx++) {
+          const base = (gy * gridW + gx) * channels
+          const confidence = data[base + 4]
+          if (confidence >= CONF_THRESHOLD) {
+            const cx = data[base]
+            const cy = data[base + 1]
+            const w = data[base + 2]
+            const h = data[base + 3]
+            regions.push({
+              x: Math.max(0, Math.min(1, cx - w / 2)),
+              y: Math.max(0, Math.min(1, cy - h / 2)),
+              width: Math.max(0.05, Math.min(1, w)),
+              height: Math.max(0.05, Math.min(1, h)),
+              confidence: Math.min(1, confidence),
+            })
+          }
+        }
       }
 
-      return regions
+      return regions.slice(0, 10)
     } catch (error) {
       console.error("Error al detectar regiones:", error)
       return []
     }
   }
 
-  // Detectar malezas en una imagen
   public async detectWeed(image: ImageData | HTMLImageElement): Promise<{
     weedType: WeedType
     confidence: number
     allPredictions: { type: WeedType; confidence: number }[]
     regions: DetectedRegion[]
+    isDemo: boolean
   }> {
-    if (!this.model || !this.regionModel) {
+    if (!this.model && !this.isModelLoading) {
       await this.loadModels()
     }
 
-    if (!this.model || !this.regionModel) {
-      throw new Error("Los modelos no están disponibles")
+    if (!this.model) {
+      const demo = this.simulatePrediction()
+      return { ...demo, isDemo: true }
     }
 
-    // Preprocesar la imagen
-    const tensor = await this.preprocessImage(image)
+    const tensor = this.preprocessImage(image)
 
     try {
-      // Realizar la predicción de clasificación
       const predictions = (await this.model.predict(tensor)) as tf.Tensor
-
-      // Obtener los resultados
       const probabilities = await predictions.data()
-
-      // Detectar regiones
       const regions = await this.detectRegions(tensor)
 
-      // Liberar memoria
       tensor.dispose()
       predictions.dispose()
 
-      // Obtener el índice de la clase con mayor probabilidad
-      const maxProbabilityIndex = probabilities.indexOf(Math.max(...Array.from(probabilities)))
+      const probsArray = Array.from(probabilities)
+      const maxIndex = probsArray.indexOf(Math.max(...probsArray))
 
-      // Mapear todas las predicciones
-      const allPredictions = Array.from(probabilities).map((confidence, index) => ({
-        type: this.CLASS_NAMES[index] || WeedType.UNKNOWN,
-        confidence: Number.parseFloat((confidence * 100).toFixed(2)),
-      }))
+      const allPredictions = probsArray
+        .map((confidence, index) => ({
+          type: this.CLASS_NAMES[index] || WeedType.UNKNOWN,
+          confidence: Number.parseFloat((confidence * 100).toFixed(2)),
+        }))
+        .sort((a, b) => b.confidence - a.confidence)
 
-      // Ordenar por confianza (de mayor a menor)
-      allPredictions.sort((a, b) => b.confidence - a.confidence)
+      const topConfidence = probsArray[maxIndex] * 100
+      const isUncertain = topConfidence < 50
 
-      // Devolver el resultado
       return {
-        weedType: this.CLASS_NAMES[maxProbabilityIndex] || WeedType.UNKNOWN,
-        confidence: Number.parseFloat((probabilities[maxProbabilityIndex] * 100).toFixed(2)),
+        weedType: isUncertain ? WeedType.UNKNOWN : this.CLASS_NAMES[maxIndex] || WeedType.UNKNOWN,
+        confidence: Number.parseFloat(topConfidence.toFixed(2)),
         allPredictions,
         regions,
+        isDemo: false,
       }
     } catch (error) {
       console.error("Error al realizar la predicción:", error)
-      throw new Error("No se pudo analizar la imagen")
+      tensor.dispose()
+      const demo = this.simulatePrediction()
+      return { ...demo, isDemo: true }
     }
   }
 
@@ -341,54 +194,41 @@ export class WeedDetector {
     allPredictions: { type: WeedType; confidence: number }[]
     regions: DetectedRegion[]
   } {
-    // Generar probabilidades más realistas con una especie dominante
-    const randomProbabilities = this.CLASS_NAMES.map((_, index) => {
-      if (index === 0) return Math.random() * 0.6 + 0.3 // 30-90% para la primera
-      return Math.random() * 0.3 // 0-30% para las demás
-    })
-
-    // Normalizar para que sumen 1
+    const randomProbabilities = this.CLASS_NAMES.map(() => Math.random())
     const sum = randomProbabilities.reduce((a, b) => a + b, 0)
-    const normalizedProbabilities = randomProbabilities.map((p) => p / sum)
+    const normalized = randomProbabilities.map((p) => p / sum)
 
-    // Obtener el índice de la clase con mayor probabilidad
-    const maxProbabilityIndex = normalizedProbabilities.indexOf(Math.max(...normalizedProbabilities))
+    const maxIndex = normalized.indexOf(Math.max(...normalized))
+    const maxConfidence = normalized[maxIndex] * 100
 
-    // Asegurar que la confianza mínima sea 40%
-    const maxConfidence = Math.max(normalizedProbabilities[maxProbabilityIndex] * 100, 40)
+    const allPredictions = normalized
+      .map((confidence, index) => ({
+        type: this.CLASS_NAMES[index] || WeedType.UNKNOWN,
+        confidence: Number.parseFloat((confidence * 100).toFixed(2)),
+      }))
+      .sort((a, b) => b.confidence - a.confidence)
 
-    // Mapear todas las predicciones
-    const allPredictions = normalizedProbabilities.map((confidence, index) => ({
-      type: this.CLASS_NAMES[index] || WeedType.UNKNOWN,
-      confidence: Number.parseFloat((confidence * 100).toFixed(2)),
-    }))
-
-    // Ordenar por confianza (de mayor a menor)
-    allPredictions.sort((a, b) => b.confidence - a.confidence)
-
-    // Generar regiones más realistas
-    const numRegions = Math.floor(Math.random() * 2) + 1 // 1-2 regiones
+    const numRegions = Math.floor(Math.random() * 2) + 1
     const regions: DetectedRegion[] = []
 
     for (let i = 0; i < numRegions; i++) {
       regions.push({
-        x: Math.random() * 0.6 + 0.1, // Valores entre 0.1 y 0.7
-        y: Math.random() * 0.6 + 0.1, // Valores entre 0.1 y 0.7
-        width: Math.random() * 0.2 + 0.15, // Valores entre 0.15 y 0.35
-        height: Math.random() * 0.2 + 0.15, // Valores entre 0.15 y 0.35
-        confidence: Math.random() * 0.2 + 0.8, // Valores entre 0.8 y 1.0
+        x: Math.random() * 0.6 + 0.1,
+        y: Math.random() * 0.6 + 0.1,
+        width: Math.random() * 0.2 + 0.15,
+        height: Math.random() * 0.2 + 0.15,
+        confidence: Math.random() * 0.2 + 0.6,
       })
     }
 
     return {
-      weedType: this.CLASS_NAMES[maxProbabilityIndex] || WeedType.UNKNOWN,
-      confidence: maxConfidence,
+      weedType: this.CLASS_NAMES[maxIndex] || WeedType.UNKNOWN,
+      confidence: Number.parseFloat(maxConfidence.toFixed(2)),
       allPredictions,
       regions,
     }
   }
 
-  // Obtener información detallada sobre una maleza
   public getWeedInfo(weedType: WeedType): {
     scientificName: string
     commonName: string
@@ -419,7 +259,7 @@ export class WeedDetector {
             "Aplicación de glifosato en dosis adecuadas",
           ],
           distribution: "Originaria de América en zonas cálidas y templadas. Común en la región pampeana argentina.",
-          images: ["/yuyo-colorado-1.jpg", "/yuyo-colorado-2.jpg"],
+          images: [],
         }
       case WeedType.RAMA_NEGRA:
         return {
@@ -441,7 +281,7 @@ export class WeedDetector {
             "Cultivos de cobertura",
           ],
           distribution: "Común en la región pampeana argentina, especialmente en bordes de caminos y cultivos.",
-          images: ["/rama-negra-1.jpg", "/rama-negra-2.jpg"],
+          images: [],
         }
       case WeedType.ROSETA:
         return {
@@ -463,7 +303,7 @@ export class WeedDetector {
             "Rotación de cultivos",
           ],
           distribution: "Norte y centro de Argentina, especialmente en suelos arenosos de la región pampeana.",
-          images: ["/roseta-1.jpg", "/roseta-2.jpg"],
+          images: [],
         }
       case WeedType.CARDO:
         return {
@@ -485,7 +325,7 @@ export class WeedDetector {
             "Manejo integrado",
           ],
           distribution: "Ampliamente distribuida en zonas templadas de Argentina y América del Sur.",
-          images: ["/cardo-1.jpg", "/cardo-2.jpg"],
+          images: [],
         }
       case WeedType.ORTIGA:
         return {
@@ -507,7 +347,7 @@ export class WeedDetector {
             "Eliminación de rizomas",
           ],
           distribution: "Cosmopolita, común en terrenos baldíos, bordes de caminos y jardines.",
-          images: ["/ortiga-1.jpg", "/ortiga-2.jpg"],
+          images: [],
         }
       case WeedType.DIENTE_LEON:
         return {
@@ -529,7 +369,7 @@ export class WeedDetector {
             "Mantenimiento adecuado del césped",
           ],
           distribution: "Ampliamente distribuida en zonas templadas de todo el mundo.",
-          images: ["/diente-leon-1.jpg", "/diente-leon-2.jpg"],
+          images: [],
         }
       case WeedType.PASTO_GUINEA:
         return {
@@ -551,7 +391,7 @@ export class WeedDetector {
             "Control de bordes y caminos",
           ],
           distribution: "Originario de África, ampliamente cultivado en regiones tropicales y subtropicales.",
-          images: ["/pasto-guinea-1.jpg", "/pasto-guinea-2.jpg"],
+          images: [],
         }
       case WeedType.TREBOL_BLANCO:
         return {
@@ -573,24 +413,18 @@ export class WeedDetector {
             "Control de malezas asociadas",
           ],
           distribution: "Ampliamente distribuida en zonas templadas de todo el mundo.",
-          images: ["/trebol-blanco-1.jpg", "/trebol-blanco-2.jpg"],
+          images: [],
         }
-      // Información para las demás especies...
       default:
         return {
           scientificName: "Desconocido",
           commonName: "Desconocido",
-          description: "Información no disponible para esta especie.",
-          characteristics: ["Características no disponibles"],
-          controlMethods: ["Métodos de control no disponibles"],
-          distribution: "Distribución desconocida",
+          description: "No se pudo identificar la especie con suficiente confianza. Intenta con una imagen más clara donde la planta esté bien iluminada y ocupe gran parte del encuadre.",
+          characteristics: ["Identificación no concluyente"],
+          controlMethods: ["Reintenta con otra foto para obtener un resultado más preciso"],
+          distribution: "",
           images: [],
         }
     }
   }
 }
-
-
-
-
-

@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "WeedDetect - Identificación Inteligente de Malezas",
   description: "Plataforma avanzada para la identificación y control de malezas mediante inteligencia artificial",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -31,7 +31,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-
-import './globals.css'

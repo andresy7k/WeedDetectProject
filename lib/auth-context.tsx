@@ -2,31 +2,14 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import {
-  getAuth,
   onAuthStateChanged,
   signOut as firebaseSignOut,
   type User,
   updateProfile,
   deleteUser,
 } from "firebase/auth"
-import { initializeApp } from "firebase/app"
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDPj6i_vZSMqeBAyXDgeYRcZKw0W5vvIio",
-  authDomain: "etsafe.firebaseapp.com",
-  projectId: "etsafe",
-  storageBucket: "etsafe.firebasestorage.app",
-  messagingSenderId: "63661921427",
-  appId: "1:63661921427:web:08465738fcf0618f62a966",
-  measurementId: "G-3QNVTC45GH",
-}
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
-const storage = getStorage(app)
+import { auth, storage } from "@/lib/firebase-config"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 type AuthContextType = {
   user: User | null
@@ -64,8 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (photoURL) updateData.photoURL = photoURL
 
     await updateProfile(user, updateData)
-    // Force refresh the user object
-    setUser({ ...user, ...updateData })
+    setUser({ ...user, ...updateData } as User)
   }
 
   const uploadProfileImage = async (file: File): Promise<string> => {
@@ -98,4 +80,3 @@ export function useAuth() {
   }
   return context
 }
-

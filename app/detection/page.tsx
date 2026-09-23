@@ -60,7 +60,10 @@ export default function DetectionPage() {
       height: number
       confidence: number
     }[]
+    isDemo?: boolean
   } | null>(null)
+
+  const [isDemoMode, setIsDemoMode] = useState(true)
 
   const [userAnalyses, setUserAnalyses] = useState([
     { id: 1, date: "2023-10-15", species: "Amaranthus retroflexus (Yuyo Colorado)", confidence: 87 },
@@ -225,96 +228,73 @@ export default function DetectionPage() {
   }
 
   const startAnalysis = async () => {
-    if (imageUrl) {
-      setIsAnalyzing(true)
+    if (!imageUrl || isAnalyzing) return
 
-      try {
-        // Simular tiempo de procesamiento más realista
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+    setIsAnalyzing(true)
 
-        // Usar simulación mejorada que siempre devuelve resultados
-        const result = weedDetector.simulatePrediction()
+    try {
+      let imgElement: HTMLImageElement | null = imageRef.current
 
-        // Asegurar que siempre hay un resultado válido
-        if (!result || result.confidence < 30) {
-          // Forzar un resultado mínimo
-          const fallbackResult = {
-            weedType: WeedType.YUYO_COLORADO,
-            confidence: 45,
-            allPredictions: [
-              { type: WeedType.YUYO_COLORADO, confidence: 45 },
-              { type: WeedType.RAMA_NEGRA, confidence: 25 },
-              { type: WeedType.ROSETA, confidence: 20 },
-            ],
-            regions: [
-              {
-                x: 0.3,
-                y: 0.2,
-                width: 0.25,
-                height: 0.3,
-                confidence: 0.85,
-              },
-            ],
+      if (!imgElement && imageUrl) {
+        imgElement = new Image()
+        imgElement.crossOrigin = "anonymous"
+        imgElement.src = imageUrl
+        await new Promise<void>((resolve, reject) => {
+          if (imgElement!.complete && imgElement!.naturalWidth > 0) {
+            resolve()
+            return
           }
-          setDetectionResult(fallbackResult)
-        } else {
-          setDetectionResult(result)
+          imgElement!.onload = () => resolve()
+          imgElement!.onerror = () => reject(new Error("No se pudo cargar la imagen"))
+        })
+      }
+
+      if (!imgElement) {
+        throw new Error("No hay imagen para analizar")
+      }
+
+      const result = await weedDetector.detectWeed(imgElement)
+      setIsDemoMode(result.isDemo)
+
+      setDetectionResult(result)
+
+      if (user) {
+        const newAnalysis = {
+          id: Date.now(),
+          date: new Date().toLocaleDateString(),
+          species: result.weedType,
+          confidence: result.confidence,
+          imageUrl: imageUrl,
+          regions: result.regions || [],
         }
 
-        // Guardar el análisis en el historial si el usuario está autenticado
-        if (user) {
-          const newAnalysis = {
-            id: Date.now(),
-            date: new Date().toLocaleDateString(),
-            species: result.weedType,
-            confidence: result.confidence,
-            imageUrl: imageUrl,
-            regions: result.regions || [],
-          }
-
-
-          setUserAnalyses((prev) => [newAnalysis, ...prev])
-
-          toast({
-            title: "Análisis completado",
-            description: "El resultado ha sido guardado en tu historial",
-          })
-        }
-
-        setShowResults(true)
-      } catch (error) {
-        console.error("Error en el análisis:", error)
-
-        // En caso de error, mostrar un resultado de ejemplo
-        const exampleResult = {
-          weedType: WeedType.YUYO_COLORADO,
-          confidence: 42,
-          allPredictions: [
-            { type: WeedType.YUYO_COLORADO, confidence: 42 },
-            { type: WeedType.RAMA_NEGRA, confidence: 28 },
-            { type: WeedType.ROSETA, confidence: 18 },
-          ],
-          regions: [
-            {
-              x: 0.25,
-              y: 0.15,
-              width: 0.3,
-              height: 0.35,
-              confidence: 0.82,
-            },
-          ],
-        }
-
-        setDetectionResult(exampleResult)
-        setShowResults(true)
+        setUserAnalyses((prev) => [newAnalysis, ...prev])
 
         toast({
           title: "Análisis completado",
-          description: "Se ha procesado la imagen con éxito",
+          description: result.isDemo
+            ? "Resultado de demostración (sin modelo entrenado)"
+            : "El resultado ha sido guardado en tu historial",
         })
-      } finally {
-        setIsAnalyzing(false)
+      } else if (result.isDemo) {
+        toast({
+          title: "Modo demostración",
+          description: "No hay modelo entrenado cargado. Los resultados son aleatorios.",
+          variant: "destructive",
+        })
       }
+
+      setShowResults(true)
+    } catch (error) {
+      console.error("Error en el análisis:", error)
+
+      toast({
+        title: "Error en el análisis",
+        description: "No se pudo procesar la imagen. Intenta con otra foto.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAnalyzing(false)
     }
   }
 
@@ -701,6 +681,17 @@ export default function DetectionPage() {
                           Nueva Detección
                         </Button>
                       </div>
+
+                      {(isDemoMode || detectionResult?.isDemo) && (
+                        <div className="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm text-yellow-200">
+                            <strong>Modo demostración:</strong> no hay un modelo entrenado cargado
+                            (<code className="text-yellow-400">/models/classification-model.json</code>).
+                            Estos resultados son <strong>aleatorios y no son predicciones reales</strong>.
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Reemplazar la sección de visualización de la imagen analizada con: */}

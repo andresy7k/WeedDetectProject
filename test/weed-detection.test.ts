@@ -1,4 +1,4 @@
-import { WeedDetector, WeedType, DetectedRegion } from 'C:/Users/Andress/Desktop/WeedDetect/lib/weed-detection';
+import { WeedDetector, WeedType } from '../lib/weed-detection';
 import * as tf from '@tensorflow/tfjs';
 
 // Mock TensorFlow.js

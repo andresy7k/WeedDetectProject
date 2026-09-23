@@ -10,44 +10,61 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Leaf, Github, AlertCircle } from "lucide-react"
-import { initializeApp } from "firebase/app"
 import {
-  getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
   GithubAuthProvider,
   sendPasswordResetEmail,
+  updateProfile,
 } from "firebase/auth"
+import { auth } from "@/lib/firebase-config"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDPj6i_vZSMqeBAyXDgeYRcZKw0W5vvIio",
-  authDomain: "etsafe.firebaseapp.com",
-  projectId: "etsafe",
-  storageBucket: "etsafe.firebasestorage.app",
-  messagingSenderId: "63661921427",
-  appId: "1:63661921427:web:08465738fcf0618f62a966",
-  measurementId: "G-3QNVTC45GH",
-}
-
-// Modificar la inicialización de Firebase para incluir Analytics
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-let analytics
-// Solo inicializar analytics en el cliente, no en el servidor
-if (typeof window !== "undefined") {
-  // Importación dinámica para evitar errores en SSR
-  import("firebase/analytics").then(({ getAnalytics }) => {
-    analytics = getAnalytics(app)
-  })
-}
-const auth = getAuth(app)
 const googleProvider = new GoogleAuthProvider()
 const githubProvider = new GithubAuthProvider()
+
+function friendlyAuthError(error: any): string {
+  const code = error?.code || ""
+  if (
+    code === "auth/invalid-credential" ||
+    code === "auth/user-not-found" ||
+    code === "auth/wrong-password" ||
+    code === "auth/invalid-login-credentials"
+  ) {
+    return "Email o contraseña incorrectos."
+  }
+  if (code === "auth/too-many-requests") {
+    return "Demasiados intentos fallidos. Inténtalo más tarde."
+  }
+  if (code === "auth/email-already-in-use") {
+    return "Este email ya está registrado."
+  }
+  if (code === "auth/invalid-email") {
+    return "Email inválido."
+  }
+  if (code === "auth/weak-password") {
+    return "La contraseña debe tener al menos 6 caracteres."
+  }
+  if (code === "auth/unauthorized-domain") {
+    return "Este dominio no está autorizado en Firebase. Agrega el dominio en Firebase Console → Authentication → Settings → Authorized domains."
+  }
+  if (code === "auth/popup-blocked") {
+    return "El navegador bloqueó la ventana de inicio de sesión. Permite popups para este sitio."
+  }
+  if (code === "auth/popup-closed-by-user") {
+    return "Se cerró la ventana de inicio de sesión antes de completar."
+  }
+  if (code === "auth/account-exists-with-different-credential") {
+    return "Ya existe una cuenta con este email usando otro método de inicio de sesión."
+  }
+  if (error?.message) {
+    return error.message
+  }
+  return "Error de autenticación. Inténtalo de nuevo."
+}
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState("login")
@@ -78,14 +95,7 @@ export default function LoginPage() {
       }, 1500)
     } catch (error: any) {
       console.error("Error al iniciar sesión:", error)
-      let errorMessage = "Error al iniciar sesión. Inténtalo de nuevo."
-
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        errorMessage = "Email o contraseña incorrectos."
-      } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Demasiados intentos fallidos. Inténtalo más tarde."
-      }
-
+      const errorMessage = friendlyAuthError(error)
       setError(errorMessage)
       toast({
         title: "Error de autenticación",
@@ -109,25 +119,22 @@ export default function LoginPage() {
     }
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password)
-      setSuccess("Registro exitoso")
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+      if (name.trim()) {
+        await updateProfile(credential.user, { displayName: name.trim() })
+      }
+      setSuccess("Registro exitoso. Sesión iniciada automáticamente.")
       toast({
         title: "Cuenta creada exitosamente",
-        description: "Ya puedes iniciar sesión con tus credenciales",
+        description: "Sesión iniciada. Redirigiendo...",
         variant: "default",
       })
-      // Cambiar a la pestaña de inicio de sesión después del registro
-      setActiveTab("login")
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 1500)
     } catch (error: any) {
       console.error("Error al registrarse:", error)
-      let errorMessage = "Error al crear la cuenta. Inténtalo de nuevo."
-
-      if (error.code === "auth/email-already-in-use") {
-        errorMessage = "Este email ya está registrado."
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Email inválido."
-      }
-
+      const errorMessage = friendlyAuthError(error)
       setError(errorMessage)
       toast({
         title: "Error de registro",
@@ -157,10 +164,11 @@ export default function LoginPage() {
       }, 1500)
     } catch (error: any) {
       console.error("Error al iniciar sesión con Google:", error)
-      setError("Error al iniciar sesión con Google. Inténtalo de nuevo.")
+      const errorMessage = friendlyAuthError(error)
+      setError(errorMessage)
       toast({
         title: "Error de autenticación",
-        description: "No se pudo iniciar sesión con Google",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -180,16 +188,16 @@ export default function LoginPage() {
         description: "Redirigiendo al panel principal...",
         variant: "default",
       })
-      // Redirigir al usuario después de un inicio de sesión exitoso
       setTimeout(() => {
         window.location.href = "/"
       }, 1500)
     } catch (error: any) {
       console.error("Error al iniciar sesión con GitHub:", error)
-      setError("Error al iniciar sesión con GitHub. Inténtalo de nuevo.")
+      const errorMessage = friendlyAuthError(error)
+      setError(errorMessage)
       toast({
         title: "Error de autenticación",
-        description: "No se pudo iniciar sesión con GitHub",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -216,10 +224,11 @@ export default function LoginPage() {
       })
     } catch (error: any) {
       console.error("Error al enviar correo de restablecimiento:", error)
-      setError("No se pudo enviar el correo de restablecimiento. Verifica tu email.")
+      const errorMessage = friendlyAuthError(error)
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: "No se pudo enviar el correo de restablecimiento",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

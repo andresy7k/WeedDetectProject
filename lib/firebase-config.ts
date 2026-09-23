@@ -1,8 +1,8 @@
-import { initializeApp } from "firebase/app"
+import { initializeApp, getApps, getApp } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
+import { getAuth } from "firebase/auth"
 
-// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDPj6i_vZSMqeBAyXDgeYRcZKw0W5vvIio",
   authDomain: "etsafe.firebaseapp.com",
@@ -13,16 +13,19 @@ const firebaseConfig = {
   measurementId: "G-3QNVTC45GH",
 }
 
-// Initialize Firebase
-export const app = initializeApp(firebaseConfig)
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
+export const auth = getAuth(app)
 
-// Inicializar analytics solo en el cliente
 if (typeof window !== "undefined") {
-  // Importación dinámica para evitar errores en SSR
-  import("firebase/analytics").then(({ getAnalytics }) => {
-    getAnalytics(app)
-  })
+  import("firebase/analytics")
+    .then(({ getAnalytics }) => {
+      try {
+        getAnalytics(app)
+      } catch {
+        // analytics optional
+      }
+    })
+    .catch(() => {})
 }
-
